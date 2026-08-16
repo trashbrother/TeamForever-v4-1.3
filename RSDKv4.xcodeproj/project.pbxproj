@@ -15,13 +15,13 @@
 		537806BA2E22AD3700796AA8 /* theoraplay.c in Sources */ = {isa = PBXBuildFile; fileRef = 537806B02E22AD3700796AA8 /* theoraplay.c */; };
 		537806BE2E22B0BF00796AA8 /* Video.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 537806BD2E22B0BF00796AA8 /* Video.cpp */; };
 		53F97B8C2E22DA88004F2B6B /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B882E22DA88004F2B6B /* libSDL2-2.0.0.dylib */; };
-		53F97B8D2E22DA88004F2B6B /* libtheora.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B892E22DA88004F2B6B /* libtheora.0.dylib */; };
+		53F97B8D2E22DA88004F2B6B /* libtheora.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B892E22DA88004F2B6B /* libtheora.1.dylib */; };
 		53F97B8E2E22DA88004F2B6B /* libvorbis.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B8A2E22DA88004F2B6B /* libvorbis.0.dylib */; };
 		53F97B8F2E22DA88004F2B6B /* libvorbisfile.3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B8B2E22DA88004F2B6B /* libvorbisfile.3.dylib */; };
 		53F97B902E22DA88004F2B6B /* libogg.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B872E22DA88004F2B6B /* libogg.0.dylib */; };
 		53F97B912E22DAAE004F2B6B /* libogg.0.dylib in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B872E22DA88004F2B6B /* libogg.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		53F97B922E22DAAE004F2B6B /* libSDL2-2.0.0.dylib in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B882E22DA88004F2B6B /* libSDL2-2.0.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		53F97B932E22DAAE004F2B6B /* libtheora.0.dylib in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B892E22DA88004F2B6B /* libtheora.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		53F97B932E22DAAE004F2B6B /* libtheora.1.dylib in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B892E22DA88004F2B6B /* libtheora.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		53F97B942E22DAAE004F2B6B /* libvorbis.0.dylib in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B8A2E22DA88004F2B6B /* libvorbis.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		53F97B952E22DAAE004F2B6B /* libvorbisfile.3.dylib in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 53F97B8B2E22DA88004F2B6B /* libvorbisfile.3.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		9E1BEFCB29FCACE200A1C6D8 /* ModAPI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C975E71426E3199000F09AD4 /* ModAPI.cpp */; };
@@ -104,7 +104,7 @@
 			files = (
 				53F97B912E22DAAE004F2B6B /* libogg.0.dylib in Embed Frameworks */,
 				53F97B922E22DAAE004F2B6B /* libSDL2-2.0.0.dylib in Embed Frameworks */,
-				53F97B932E22DAAE004F2B6B /* libtheora.0.dylib in Embed Frameworks */,
+				53F97B932E22DAAE004F2B6B /* libtheora.1.dylib in Embed Frameworks */,
 				53F97B942E22DAAE004F2B6B /* libvorbis.0.dylib in Embed Frameworks */,
 				53F97B952E22DAAE004F2B6B /* libvorbisfile.3.dylib in Embed Frameworks */,
 			);
@@ -126,7 +126,7 @@
 		537806BF2E22B0C600796AA8 /* Video.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Video.hpp; sourceTree = "<group>"; };
 		53F97B872E22DA88004F2B6B /* libogg.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libogg.0.dylib; sourceTree = "<group>"; };
 		53F97B882E22DA88004F2B6B /* libSDL2-2.0.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libSDL2-2.0.0.dylib"; sourceTree = "<group>"; };
-		53F97B892E22DA88004F2B6B /* libtheora.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libtheora.0.dylib; sourceTree = "<group>"; };
+		53F97B892E22DA88004F2B6B /* libtheora.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libtheora.1.dylib; sourceTree = "<group>"; };
 		53F97B8A2E22DA88004F2B6B /* libvorbis.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libvorbis.0.dylib; sourceTree = "<group>"; };
 		53F97B8B2E22DA88004F2B6B /* libvorbisfile.3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libvorbisfile.3.dylib; sourceTree = "<group>"; };
 		9E1BEFB229FCAA8C00A1C6D8 /* IndirectMain.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = IndirectMain.cpp; path = dependencies/mac/IndirectMain.cpp; sourceTree = SOURCE_ROOT; };
@@ -279,7 +279,7 @@
 				53F97B902E22DA88004F2B6B /* libogg.0.dylib in Frameworks */,
 				53F97B8E2E22DA88004F2B6B /* libvorbis.0.dylib in Frameworks */,
 				53F97B8F2E22DA88004F2B6B /* libvorbisfile.3.dylib in Frameworks */,
-				53F97B8D2E22DA88004F2B6B /* libtheora.0.dylib in Frameworks */,
+				53F97B8D2E22DA88004F2B6B /* libtheora.1.dylib in Frameworks */,
 				9E1BF03729FCAFE400A1C6D8 /* OpenGL.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -345,7 +345,7 @@
 			children = (
 				53F97B872E22DA88004F2B6B /* libogg.0.dylib */,
 				53F97B882E22DA88004F2B6B /* libSDL2-2.0.0.dylib */,
-				53F97B892E22DA88004F2B6B /* libtheora.0.dylib */,
+				53F97B892E22DA88004F2B6B /* libtheora.1.dylib */,
 				53F97B8A2E22DA88004F2B6B /* libvorbis.0.dylib */,
 				53F97B8B2E22DA88004F2B6B /* libvorbisfile.3.dylib */,
 				C962191B25898A9300B47AB3 /* RSDKv4 */,
@@ -773,9 +773,9 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.3.0;
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = org.decomp.RSDKv4;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -892,10 +892,10 @@
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/dependencies/mac/SDL2/include";
 				INFOPLIST_FILE = dependencies/mac/info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 			};
 			name = Release;
