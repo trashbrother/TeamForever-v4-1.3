@@ -713,6 +713,8 @@
 					"$(PROJECT_DIR)/dependencies/all/stb-image",
 					"$(PROJECT_DIR)/dependencies/all/theoraplay",
 					"$(PROJECT_DIR)/dependencies/mac/SDL2/include",
+					"$(PROJECT_DIR)/dependencies/mac/libogg/include",
+					"$(PROJECT_DIR)/dependencies/mac/libtheora/include",
 					"$(PROJECT_DIR)/dependencies/mac/libvorbis/include",
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/dependencies/mac/Info.plist";
@@ -724,7 +726,6 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/dependencies/mac/Theora.framework/Versions/A/Frameworks",
 					"$(PROJECT_DIR)",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
@@ -757,6 +758,8 @@
 					"$(PROJECT_DIR)/dependencies/all/stb-image",
 					"$(PROJECT_DIR)/dependencies/all/theoraplay",
 					"$(PROJECT_DIR)/dependencies/mac/SDL2/include",
+					"$(PROJECT_DIR)/dependencies/mac/libogg/include",
+					"$(PROJECT_DIR)/dependencies/mac/libtheora/include",
 					"$(PROJECT_DIR)/dependencies/mac/libvorbis/include",
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/dependencies/mac/Info.plist";
@@ -768,7 +771,6 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/dependencies/mac/Theora.framework/Versions/A/Frameworks",
 					"$(PROJECT_DIR)",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
