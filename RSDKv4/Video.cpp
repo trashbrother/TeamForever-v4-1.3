@@ -102,7 +102,7 @@ void PlayVideoFile(char *filePath) {
         // TODO
         // perhaps implement multi audio stream support? (e.g. sonic cd cutscenes)
 #if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
-        videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_IYUV);
+        videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_IYUV, nullptr, 1);
 #endif
 
         // TODO: does SDL1.2 support YUV?

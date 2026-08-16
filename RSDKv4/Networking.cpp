@@ -137,7 +137,7 @@ public:
         if (repeat.header != 0x80 && retried) {
             retried = false;
 #if RETRO_PLATFORM != RETRO_SWITCH
-            timer.expires_from_now(asio::chrono::seconds(1));
+            timer.expires_after(asio::chrono::seconds(1));
             timer.async_wait([&](const asio::error_code &) { timerCB(); });
 #else
             retryTime = time(NULL);
