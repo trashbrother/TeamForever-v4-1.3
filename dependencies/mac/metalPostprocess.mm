@@ -182,6 +182,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "        mask.b = 1.0;\n"
              "\n"
              "    color.rgb *= mask;\n"
+             "    color.rgb *= 1.12;\n"
              "    color.rgb = pow(max(color.rgb, float3(0.0)), float3(1.0 / 2.2));\n"
              "    color.a = 1.0;\n"
              "    return color;\n"
