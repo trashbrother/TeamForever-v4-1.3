@@ -528,7 +528,9 @@ void FlipScreen()
 #if defined(__APPLE__)
         SDL_RenderFlush(Engine.renderer);
         void *metalEncoder = SDL_RenderGetMetalCommandEncoder(Engine.renderer);
+        void *metalLayer = SDL_RenderGetMetalLayer(Engine.renderer);
         metalPostprocessProbe(metalEncoder);
+        metalLayerProbe(metalLayer);
 #endif
         SDL_RenderPresent(Engine.renderer);
     }
