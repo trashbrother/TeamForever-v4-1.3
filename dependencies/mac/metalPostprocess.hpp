@@ -4,5 +4,6 @@
 void metalPostprocessProbe(void *encoder);
 void metalTextureProbe(void *texture);
 void metalLayerProbe(void *layer);
+void metalOverlayProbe(void *encoder, void *layer);
 
 #endif
