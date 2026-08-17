@@ -1,0 +1,76 @@
+--- a/include/SDL_render.h
++++ b/include/SDL_render.h
+@@ -1911,6 +1911,16 @@
+ extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandEncoder(SDL_Renderer * renderer);
+ 
+ /**
++ * Get the native Metal texture associated with an SDL_Texture.
++ *
++ * This is a local macOS extension used by the RSDKv4 Metal postprocessor.
++ *
++ * \param texture the SDL texture to query.
++ * \returns an `id<MTLTexture>` cast to `void *`, or NULL if unavailable.
++ */
++extern DECLSPEC void *SDLCALL SDL_RenderGetMetalTexture(SDL_Texture * texture);
++
++/**
+  * Toggle VSync of the given renderer.
+  *
+  * \param renderer The renderer to toggle.
+--- a/src/render/metal/SDL_render_metal.m
++++ b/src/render/metal/SDL_render_metal.m
+@@ -159,6 +159,33 @@
+ @implementation METAL_TextureData
+ @end
+ 
++void *SDLCALL SDL_RenderGetMetalTexture(SDL_Texture *texture)
++{
++    METAL_TextureData *texturedata;
++
++    @autoreleasepool {
++        if (texture == NULL) {
++            return NULL;
++        }
++
++        if (texture->native != NULL) {
++            texture = texture->native;
++        }
++
++        if (texture->driverdata == NULL) {
++            return NULL;
++        }
++
++        texturedata = (__bridge METAL_TextureData *)texture->driverdata;
++
++        if (texturedata.mtltexture == nil) {
++            return NULL;
++        }
++
++        return (__bridge void *)texturedata.mtltexture;
++    }
++}
++
+ static int IsMetalAvailable(const SDL_SysWMinfo *syswm)
+ {
+     if (syswm->subsystem != SDL_SYSWM_COCOA && syswm->subsystem != SDL_SYSWM_UIKIT) {
+--- a/src/dynapi/SDL2.exports
++++ b/src/dynapi/SDL2.exports
+@@ -872,3 +872,4 @@
+ ++'_SDL_DestroyWindowSurface'.'SDL2.dll'.'SDL_DestroyWindowSurface'
+ # ++'_SDL_GDKGetDefaultUser'.'SDL2.dll'.'SDL_GDKGetDefaultUser'
+ ++'_SDL_GameControllerGetSteamHandle'.'SDL2.dll'.'SDL_GameControllerGetSteamHandle'
++++'_SDL_RenderGetMetalTexture'.'SDL2.dll'.'SDL_RenderGetMetalTexture'
+--- a/src/dynapi/SDL_dynapi_overrides.h
++++ b/src/dynapi/SDL_dynapi_overrides.h
+@@ -898,3 +898,4 @@
+ #define SDL_DestroyWindowSurface SDL_DestroyWindowSurface_REAL
+ #define SDL_GDKGetDefaultUser SDL_GDKGetDefaultUser_REAL
+ #define SDL_GameControllerGetSteamHandle SDL_GameControllerGetSteamHandle_REAL
++#define SDL_RenderGetMetalTexture SDL_RenderGetMetalTexture_REAL
+--- a/src/dynapi/SDL_dynapi_procs.h
++++ b/src/dynapi/SDL_dynapi_procs.h
+@@ -985,3 +985,4 @@
+ SDL_DYNAPI_PROC(int,SDL_GDKGetDefaultUser,(XUserHandle *a),(a),return)
+ #endif
+ SDL_DYNAPI_PROC(Uint64,SDL_GameControllerGetSteamHandle,(SDL_GameController *a),(a),return)
++SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalTexture,(SDL_Texture *a),(a),return)

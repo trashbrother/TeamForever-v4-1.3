@@ -91,6 +91,8 @@
 		9E1BF01F29FCAD0500A1C6D8 /* Scene3D.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C962196025898BF600B47AB3 /* Scene3D.cpp */; };
 		9E1BF02029FCAD0500A1C6D8 /* Script.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C962196525898BF600B47AB3 /* Script.cpp */; };
 		9E1BF03629FCAFE400A1C6D8 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9EA0885129FA11AF00163B50 /* AppKit.framework */; };
+		A10000000000000000000003 /* metalPostprocess.mm in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* metalPostprocess.mm */; };
+		A10000000000000000000005 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* Metal.framework */; };
 		9E1BF03729FCAFE400A1C6D8 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C975E69826E3190B00F09AD4 /* OpenGL.framework */; };
 		9E1BF03929FCB18900A1C6D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C962193625898B0A00B47AB3 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -134,7 +136,10 @@
 		9E1BEFB429FCAA8C00A1C6D8 /* main.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = main.mm; path = dependencies/mac/main.mm; sourceTree = SOURCE_ROOT; };
 		9E1BEFBB29FCABB100A1C6D8 /* RSDKv4.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RSDKv4.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9EA0885129FA11AF00163B50 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		A10000000000000000000004 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		C9283533264621BB00D51CCE /* cocoaHelpers.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = cocoaHelpers.mm; path = dependencies/mac/cocoaHelpers.mm; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000001 /* metalPostprocess.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = metalPostprocess.mm; path = dependencies/mac/metalPostprocess.mm; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000002 /* metalPostprocess.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = metalPostprocess.hpp; path = dependencies/mac/metalPostprocess.hpp; sourceTree = SOURCE_ROOT; };
 		C9283535264621C800D51CCE /* cocoaHelpers.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = cocoaHelpers.hpp; path = dependencies/mac/cocoaHelpers.hpp; sourceTree = SOURCE_ROOT; };
 		C962193625898B0A00B47AB3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = dependencies/mac/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		C962194125898BCD00B47AB3 /* Text.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = Text.hpp; path = RSDKv4/Text.hpp; sourceTree = SOURCE_ROOT; };
@@ -275,6 +280,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9E1BF03629FCAFE400A1C6D8 /* AppKit.framework in Frameworks */,
+				A10000000000000000000005 /* Metal.framework in Frameworks */,
 				53F97B8C2E22DA88004F2B6B /* libSDL2-2.0.0.dylib in Frameworks */,
 				53F97B902E22DA88004F2B6B /* libogg.0.dylib in Frameworks */,
 				53F97B8E2E22DA88004F2B6B /* libvorbis.0.dylib in Frameworks */,
@@ -324,6 +330,7 @@
 				C975E71F26E31AB200F09AD4 /* tinyxml2.h */,
 				C975E71E26E31AA800F09AD4 /* stb_image.h */,
 				C9283535264621C800D51CCE /* cocoaHelpers.hpp */,
+				A10000000000000000000002 /* metalPostprocess.hpp */,
 			);
 			name = Helpers;
 			sourceTree = "<group>";
@@ -332,6 +339,7 @@
 			isa = PBXGroup;
 			children = (
 				C9283533264621BB00D51CCE /* cocoaHelpers.mm */,
+				A10000000000000000000001 /* metalPostprocess.mm */,
 				9E1BEFB229FCAA8C00A1C6D8 /* IndirectMain.cpp */,
 				9E1BEFB329FCAA8C00A1C6D8 /* IndirectMain.h */,
 				9E1BEFB429FCAA8C00A1C6D8 /* main.mm */,
@@ -442,6 +450,7 @@
 			isa = PBXGroup;
 			children = (
 				9EA0885129FA11AF00163B50 /* AppKit.framework */,
+				A10000000000000000000004 /* Metal.framework */,
 				C975E69826E3190B00F09AD4 /* OpenGL.framework */,
 			);
 			name = Frameworks;
@@ -661,6 +670,7 @@
 				9E1BEFE529FCACF300A1C6D8 /* SettingsScreen.cpp in Sources */,
 				9E1BEFD629FCACF300A1C6D8 /* RecordsScreen.cpp in Sources */,
 				9E1BEFCE29FCACE600A1C6D8 /* cocoaHelpers.mm in Sources */,
+				A10000000000000000000003 /* metalPostprocess.mm in Sources */,
 				9E1BEFD829FCACF300A1C6D8 /* CreditText.cpp in Sources */,
 				9E1BEFE729FCACF300A1C6D8 /* AchievementsButton.cpp in Sources */,
 				9E1BEFF629FCACF300A1C6D8 /* MultiplayerScreen.cpp in Sources */,

@@ -1,5 +1,9 @@
 #include "RetroEngine.hpp"
 
+#if defined(__APPLE__)
+#include "metalPostprocess.hpp"
+#endif
+
 ushort blendLookupTable[0x20 * 0x100];
 ushort subtractLookupTable[0x20 * 0x100];
 ushort tintLookupTable[0x10000];
@@ -417,6 +421,11 @@ void FlipScreen()
             // memcpy(pixels, Engine.frameBuffer, pitch * SCREEN_YSIZE); //faster but produces issues with odd numbered screen sizes
             SDL_UnlockTexture(Engine.screenBuffer);
 
+#if defined(__APPLE__)
+            void *metalScreenTexture = SDL_RenderGetMetalTexture(Engine.screenBuffer);
+            metalTextureProbe(metalScreenTexture);
+#endif
+
             SDL_RenderCopy(Engine.renderer, Engine.screenBuffer, NULL, NULL);
         }
         else {
@@ -467,6 +476,21 @@ void FlipScreen()
         SDL_RenderFillRect(Engine.renderer, NULL);
     }
 
+#if defined(__APPLE__)
+    {
+        static bool scalingProbeDone = false;
+        if (!scalingProbeDone) {
+            FILE *f = fopen("/tmp/rsdkv4-scaling-path.txt", "w");
+            if (f) {
+                fprintf(f, "scalingMode: %d\n", Engine.scalingMode);
+                fprintf(f, "disableEnhancedScaling: %d\n", disableEnhancedScaling ? 1 : 0);
+                fclose(f);
+            }
+            scalingProbeDone = true;
+        }
+    }
+#endif
+
     if (Engine.scalingMode != 0 && !disableEnhancedScaling) {
         // set render target back to the screen.
         SDL_SetRenderTarget(Engine.renderer, NULL);
@@ -474,11 +498,20 @@ void FlipScreen()
         SDL_RenderClear(Engine.renderer);
         // copy texture to screen with lerp
         SDL_RenderCopy(Engine.renderer, texTarget, NULL, &destScreenPos_scaled);
+#if defined(__APPLE__)
+        void *metalTexture = SDL_RenderGetMetalTexture(texTarget);
+        metalTextureProbe(metalTexture);
+#endif
         // Apply dimming
         SDL_SetRenderDrawColor(Engine.renderer, 0, 0, 0, 0xFF - (dimAmount * 0xFF));
         if (dimAmount < 1.0)
             SDL_RenderFillRect(Engine.renderer, NULL);
         // finally present it
+#if defined(__APPLE__)
+        SDL_RenderFlush(Engine.renderer);
+        void *metalEncoder = SDL_RenderGetMetalCommandEncoder(Engine.renderer);
+        metalPostprocessProbe(metalEncoder);
+#endif
         SDL_RenderPresent(Engine.renderer);
         // reset everything just in case
         SDL_RenderSetLogicalSize(Engine.renderer, SCREEN_XSIZE, SCREEN_YSIZE);
@@ -492,6 +525,11 @@ void FlipScreen()
         if (dimAmount < 1.0)
             SDL_RenderFillRect(Engine.renderer, NULL);
         // no change here
+#if defined(__APPLE__)
+        SDL_RenderFlush(Engine.renderer);
+        void *metalEncoder = SDL_RenderGetMetalCommandEncoder(Engine.renderer);
+        metalPostprocessProbe(metalEncoder);
+#endif
         SDL_RenderPresent(Engine.renderer);
     }
     SDL_ShowWindow(Engine.window);
