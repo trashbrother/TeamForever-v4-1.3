@@ -51,17 +51,20 @@ void metalLayerProbe(void *layerPtr)
     checked = true;
 }
 
-void metalOverlayProbe(void *encoderPtr, void *layerPtr)
+void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
 {
-    if (!encoderPtr || !layerPtr)
+    if (!encoderPtr || !layerPtr || !texturePtr)
         return;
 
     id<MTLRenderCommandEncoder> encoder =
         (__bridge id<MTLRenderCommandEncoder>)encoderPtr;
     CAMetalLayer *layer =
         (__bridge CAMetalLayer *)layerPtr;
+    id<MTLTexture> texture =
+        (__bridge id<MTLTexture>)texturePtr;
 
     static id<MTLRenderPipelineState> pipeline = nil;
+    static id<MTLSamplerState> sampler = nil;
     static bool attempted = false;
 
     if (!attempted) {
@@ -73,24 +76,37 @@ void metalOverlayProbe(void *encoderPtr, void *layerPtr)
              "\n"
              "struct VSOut {\n"
              "    float4 position [[position]];\n"
+             "    float2 uv;\n"
              "};\n"
              "\n"
-             "vertex VSOut rsdkOverlayVertex(uint vid [[vertex_id]]) {\n"
-             "    const float2 p[6] = {\n"
-             "        float2(-0.95,  0.95),\n"
-             "        float2(-0.65,  0.95),\n"
-             "        float2(-0.95,  0.75),\n"
-             "        float2(-0.95,  0.75),\n"
-             "        float2(-0.65,  0.95),\n"
-             "        float2(-0.65,  0.75)\n"
+             "vertex VSOut rsdkCopyVertex(uint vid [[vertex_id]]) {\n"
+             "    const float2 pos[6] = {\n"
+             "        float2(-1.0,  1.0),\n"
+             "        float2( 1.0,  1.0),\n"
+             "        float2(-1.0, -1.0),\n"
+             "        float2(-1.0, -1.0),\n"
+             "        float2( 1.0,  1.0),\n"
+             "        float2( 1.0, -1.0)\n"
+             "    };\n"
+             "    const float2 uv[6] = {\n"
+             "        float2(0.0, 0.0),\n"
+             "        float2(1.0, 0.0),\n"
+             "        float2(0.0, 1.0),\n"
+             "        float2(0.0, 1.0),\n"
+             "        float2(1.0, 0.0),\n"
+             "        float2(1.0, 1.0)\n"
              "    };\n"
              "    VSOut out;\n"
-             "    out.position = float4(p[vid], 0.0, 1.0);\n"
+             "    out.position = float4(pos[vid], 0.0, 1.0);\n"
+             "    out.uv = uv[vid];\n"
              "    return out;\n"
              "}\n"
              "\n"
-             "fragment float4 rsdkOverlayFragment() {\n"
-             "    return float4(1.0, 0.0, 1.0, 1.0);\n"
+             "fragment float4 rsdkCopyFragment(\n"
+             "    VSOut in [[stage_in]],\n"
+             "    texture2d<float> src [[texture(0)]],\n"
+             "    sampler samp [[sampler(0)]]) {\n"
+             "    return src.sample(samp, in.uv);\n"
              "}\n";
 
         NSError *error = nil;
@@ -101,15 +117,15 @@ void metalOverlayProbe(void *encoderPtr, void *layerPtr)
 
         if (library != nil) {
             id<MTLFunction> vertexFunction =
-                [library newFunctionWithName:@"rsdkOverlayVertex"];
+                [library newFunctionWithName:@"rsdkCopyVertex"];
             id<MTLFunction> fragmentFunction =
-                [library newFunctionWithName:@"rsdkOverlayFragment"];
+                [library newFunctionWithName:@"rsdkCopyFragment"];
 
             if (vertexFunction != nil && fragmentFunction != nil) {
                 MTLRenderPipelineDescriptor *desc =
                     [[MTLRenderPipelineDescriptor alloc] init];
 
-                desc.label = @"RSDKv4 Metal Overlay Probe";
+                desc.label = @"RSDKv4 Metal Copy Probe";
                 desc.vertexFunction = vertexFunction;
                 desc.fragmentFunction = fragmentFunction;
                 desc.colorAttachments[0].pixelFormat = layer.pixelFormat;
@@ -117,12 +133,25 @@ void metalOverlayProbe(void *encoderPtr, void *layerPtr)
                 pipeline =
                     [layer.device newRenderPipelineStateWithDescriptor:desc
                                                                 error:&error];
+
+                MTLSamplerDescriptor *samplerDesc =
+                    [[MTLSamplerDescriptor alloc] init];
+
+                samplerDesc.minFilter = MTLSamplerMinMagFilterNearest;
+                samplerDesc.magFilter = MTLSamplerMinMagFilterNearest;
+                samplerDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
+                samplerDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
+
+                sampler = [layer.device newSamplerStateWithDescriptor:samplerDesc];
             }
         }
 
-        FILE *f = fopen("/tmp/rsdkv4-metal-overlay.txt", "w");
+        FILE *f = fopen("/tmp/rsdkv4-metal-copy.txt", "w");
         if (f) {
             fprintf(f, "pipeline: %s\n", pipeline ? "non-null" : "NULL");
+            fprintf(f, "sampler: %s\n", sampler ? "non-null" : "NULL");
+            fprintf(f, "textureWidth: %lu\n", (unsigned long)texture.width);
+            fprintf(f, "textureHeight: %lu\n", (unsigned long)texture.height);
             if (error)
                 fprintf(f, "error: %s\n",
                         [[error localizedDescription] UTF8String]);
@@ -130,7 +159,7 @@ void metalOverlayProbe(void *encoderPtr, void *layerPtr)
         }
     }
 
-    if (!pipeline)
+    if (!pipeline || !sampler)
         return;
 
     MTLViewport viewport;
@@ -147,10 +176,12 @@ void metalOverlayProbe(void *encoderPtr, void *layerPtr)
     scissor.width = (NSUInteger)layer.drawableSize.width;
     scissor.height = (NSUInteger)layer.drawableSize.height;
 
-    [encoder pushDebugGroup:@"RSDKv4 Metal Overlay Probe"];
+    [encoder pushDebugGroup:@"RSDKv4 Metal Copy Probe"];
     [encoder setViewport:viewport];
     [encoder setScissorRect:scissor];
     [encoder setRenderPipelineState:pipeline];
+    [encoder setFragmentTexture:texture atIndex:0];
+    [encoder setFragmentSamplerState:sampler atIndex:0];
     [encoder drawPrimitives:MTLPrimitiveTypeTriangle
                 vertexStart:0
                 vertexCount:6];
