@@ -106,7 +106,14 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    VSOut in [[stage_in]],\n"
              "    texture2d<float> src [[texture(0)]],\n"
              "    sampler samp [[sampler(0)]]) {\n"
-             "    return src.sample(samp, in.uv);\n"
+             "    float4 color = src.sample(samp, in.uv);\n"
+             "\n"
+             "    float sourceY = in.uv.y * float(src.get_height());\n"
+             "    float phase = fract(sourceY);\n"
+             "    float beam = 0.60 + 0.40 * sin(phase * M_PI_F);\n"
+             "\n"
+             "    color.rgb *= beam;\n"
+             "    return color;\n"
              "}\n";
 
         NSError *error = nil;
