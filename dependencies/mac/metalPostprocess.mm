@@ -149,6 +149,9 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    float4 color0 = clamp(raw0, min(c01, c02), max(c01, c02));\n"
              "    float4 color1 = clamp(raw1, min(c11, c12), max(c11, c12));\n"
              "\n"
+             "    color0.rgb = pow(max(color0.rgb, float3(0.0)), float3(2.2));\n"
+             "    color1.rgb = pow(max(color1.rgb, float3(0.0)), float3(2.2));\n"
+             "\n"
              "    float3 width0 = mix(float3(0.42), float3(0.68), color0.rgb);\n"
              "    float3 width1 = mix(float3(0.42), float3(0.68), color1.rgb);\n"
              "\n"
@@ -160,6 +163,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "\n"
              "    float4 color;\n"
              "    color.rgb = color0.rgb * beam0 + color1.rgb * beam1;\n"
+             "    color.rgb = pow(max(color.rgb, float3(0.0)), float3(1.0 / 2.2));\n"
              "    color.a = 1.0;\n"
              "    return color;\n"
              "}\n";
