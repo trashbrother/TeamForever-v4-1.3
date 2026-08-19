@@ -339,7 +339,10 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    VSOut in [[stage_in]],\n"
              "    texture2d<float> src [[texture(0)]],\n"
              "    sampler samp [[sampler(0)]]) {\n"
-             "    return src.sample(samp, in.uv);\n"
+             "    float4 glow = src.sample(samp, in.uv);\n"
+             "    glow.rgb *= 0.12;\n"
+             "    glow.a = 1.0;\n"
+             "    return glow;\n"
              "}\n";
 
         NSError *error = nil;
@@ -362,6 +365,14 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
                 desc.vertexFunction = vertexFunction;
                 desc.fragmentFunction = fragmentFunction;
                 desc.colorAttachments[0].pixelFormat = layer.pixelFormat;
+
+                desc.colorAttachments[0].blendingEnabled = YES;
+                desc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+                desc.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+                desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+                desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+                desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+                desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorZero;
 
                 pipeline =
                     [layer.device newRenderPipelineStateWithDescriptor:desc
