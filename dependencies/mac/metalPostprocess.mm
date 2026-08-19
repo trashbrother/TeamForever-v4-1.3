@@ -526,6 +526,10 @@ void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *textureP
              "    c += src.sample(samp, in.uv + texel * float2( 3.0, -3.0)) * 0.10;\n"
              "    c += src.sample(samp, in.uv + texel * float2(-3.0, -3.0)) * 0.10;\n"
              "\n"
+             "    float luma = dot(c.rgb, float3(0.2126, 0.7152, 0.0722));\n"
+             "    float glowMask = smoothstep(0.30, 0.75, luma);\n"
+             "    c.rgb *= glowMask;\n"
+             "\n"
              "    return c;\n"
              "}\n";
 
