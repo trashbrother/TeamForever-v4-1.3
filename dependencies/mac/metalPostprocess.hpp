@@ -5,5 +5,7 @@ void metalPostprocessProbe(void *encoder);
 void metalTextureProbe(void *texture);
 void metalLayerProbe(void *layer);
 void metalCopyProbe(void *encoder, void *layer, void *texture);
+void metalCompositeProbe(void *encoder, void *layer, void *texture);
+void *metalMultipassProbe(void *commandBuffer, void *layer, void *texture);
 
 #endif

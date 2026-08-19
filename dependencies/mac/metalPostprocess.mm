@@ -284,6 +284,318 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder popDebugGroup];
 }
 
+void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
+{
+    if (!encoderPtr || !layerPtr || !texturePtr)
+        return;
+
+    id<MTLRenderCommandEncoder> encoder =
+        (__bridge id<MTLRenderCommandEncoder>)encoderPtr;
+    CAMetalLayer *layer =
+        (__bridge CAMetalLayer *)layerPtr;
+    id<MTLTexture> texture =
+        (__bridge id<MTLTexture>)texturePtr;
+
+    static id<MTLRenderPipelineState> pipeline = nil;
+    static id<MTLSamplerState> sampler = nil;
+    static bool attempted = false;
+
+    if (!attempted) {
+        attempted = true;
+
+        static NSString *shaderSource =
+            @"#include <metal_stdlib>\n"
+             "using namespace metal;\n"
+             "\n"
+             "struct VSOut {\n"
+             "    float4 position [[position]];\n"
+             "    float2 uv;\n"
+             "};\n"
+             "\n"
+             "vertex VSOut rsdkCompositeVertex(uint vid [[vertex_id]]) {\n"
+             "    const float2 pos[6] = {\n"
+             "        float2(-1.0,  1.0),\n"
+             "        float2( 1.0,  1.0),\n"
+             "        float2(-1.0, -1.0),\n"
+             "        float2(-1.0, -1.0),\n"
+             "        float2( 1.0,  1.0),\n"
+             "        float2( 1.0, -1.0)\n"
+             "    };\n"
+             "    const float2 uv[6] = {\n"
+             "        float2(0.0, 0.0),\n"
+             "        float2(1.0, 0.0),\n"
+             "        float2(0.0, 1.0),\n"
+             "        float2(0.0, 1.0),\n"
+             "        float2(1.0, 0.0),\n"
+             "        float2(1.0, 1.0)\n"
+             "    };\n"
+             "    VSOut out;\n"
+             "    out.position = float4(pos[vid], 0.0, 1.0);\n"
+             "    out.uv = uv[vid];\n"
+             "    return out;\n"
+             "}\n"
+             "\n"
+             "fragment float4 rsdkCompositeFragment(\n"
+             "    VSOut in [[stage_in]],\n"
+             "    texture2d<float> src [[texture(0)]],\n"
+             "    sampler samp [[sampler(0)]]) {\n"
+             "    return src.sample(samp, in.uv);\n"
+             "}\n";
+
+        NSError *error = nil;
+        id<MTLLibrary> library =
+            [layer.device newLibraryWithSource:shaderSource
+                                       options:nil
+                                         error:&error];
+
+        if (library) {
+            id<MTLFunction> vertexFunction =
+                [library newFunctionWithName:@"rsdkCompositeVertex"];
+            id<MTLFunction> fragmentFunction =
+                [library newFunctionWithName:@"rsdkCompositeFragment"];
+
+            if (vertexFunction && fragmentFunction) {
+                MTLRenderPipelineDescriptor *desc =
+                    [[MTLRenderPipelineDescriptor alloc] init];
+
+                desc.label = @"RSDKv4 CRT Composite Probe";
+                desc.vertexFunction = vertexFunction;
+                desc.fragmentFunction = fragmentFunction;
+                desc.colorAttachments[0].pixelFormat = layer.pixelFormat;
+
+                pipeline =
+                    [layer.device newRenderPipelineStateWithDescriptor:desc
+                                                                error:&error];
+            }
+        }
+
+        MTLSamplerDescriptor *samplerDesc =
+            [[MTLSamplerDescriptor alloc] init];
+
+        samplerDesc.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDesc.magFilter = MTLSamplerMinMagFilterLinear;
+        samplerDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
+
+        sampler = [layer.device newSamplerStateWithDescriptor:samplerDesc];
+    }
+
+    if (!pipeline || !sampler)
+        return;
+
+    MTLViewport viewport;
+    viewport.originX = 0.0;
+    viewport.originY = 0.0;
+    viewport.width = layer.drawableSize.width;
+    viewport.height = layer.drawableSize.height;
+    viewport.znear = 0.0;
+    viewport.zfar = 1.0;
+
+    MTLScissorRect scissor;
+    scissor.x = 0;
+    scissor.y = 0;
+    scissor.width = (NSUInteger)layer.drawableSize.width;
+    scissor.height = (NSUInteger)layer.drawableSize.height;
+
+    [encoder pushDebugGroup:@"RSDKv4 CRT Composite Probe"];
+    [encoder setViewport:viewport];
+    [encoder setScissorRect:scissor];
+    [encoder setRenderPipelineState:pipeline];
+    [encoder setFragmentTexture:texture atIndex:0];
+    [encoder setFragmentSamplerState:sampler atIndex:0];
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangle
+                vertexStart:0
+                vertexCount:6];
+    [encoder popDebugGroup];
+}
+
+void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *texturePtr)
+{
+    if (!commandBufferPtr || !layerPtr || !texturePtr)
+        return NULL;
+
+    id<MTLCommandBuffer> commandBuffer =
+        (__bridge id<MTLCommandBuffer>)commandBufferPtr;
+    CAMetalLayer *layer =
+        (__bridge CAMetalLayer *)layerPtr;
+    id<MTLTexture> sourceTexture =
+        (__bridge id<MTLTexture>)texturePtr;
+
+    static id<MTLTexture> offscreenTexture = nil;
+    static id<MTLRenderPipelineState> pipeline = nil;
+    static id<MTLSamplerState> sampler = nil;
+    static NSUInteger offscreenWidth = 0;
+    static NSUInteger offscreenHeight = 0;
+    static MTLPixelFormat offscreenFormat = MTLPixelFormatInvalid;
+    static bool attemptedPipeline = false;
+
+    NSUInteger width =
+        MAX((NSUInteger)1, (NSUInteger)layer.drawableSize.width / 4);
+    NSUInteger height =
+        MAX((NSUInteger)1, (NSUInteger)layer.drawableSize.height / 4);
+
+    if (!offscreenTexture ||
+        offscreenWidth != width ||
+        offscreenHeight != height ||
+        offscreenFormat != layer.pixelFormat) {
+
+        MTLTextureDescriptor *desc =
+            [MTLTextureDescriptor
+                texture2DDescriptorWithPixelFormat:layer.pixelFormat
+                                             width:width
+                                            height:height
+                                         mipmapped:NO];
+
+        desc.storageMode = MTLStorageModePrivate;
+        desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+
+        offscreenTexture =
+            [layer.device newTextureWithDescriptor:desc];
+
+        offscreenTexture.label = @"RSDKv4 CRT Offscreen Probe";
+
+        offscreenWidth = width;
+        offscreenHeight = height;
+        offscreenFormat = layer.pixelFormat;
+    }
+
+    if (!attemptedPipeline) {
+        attemptedPipeline = true;
+
+        static NSString *shaderSource =
+            @"#include <metal_stdlib>\n"
+             "using namespace metal;\n"
+             "\n"
+             "struct VSOut {\n"
+             "    float4 position [[position]];\n"
+             "    float2 uv;\n"
+             "};\n"
+             "\n"
+             "vertex VSOut rsdkOffscreenVertex(uint vid [[vertex_id]]) {\n"
+             "    const float2 pos[6] = {\n"
+             "        float2(-1.0,  1.0),\n"
+             "        float2( 1.0,  1.0),\n"
+             "        float2(-1.0, -1.0),\n"
+             "        float2(-1.0, -1.0),\n"
+             "        float2( 1.0,  1.0),\n"
+             "        float2( 1.0, -1.0)\n"
+             "    };\n"
+             "    const float2 uv[6] = {\n"
+             "        float2(0.0, 0.0),\n"
+             "        float2(1.0, 0.0),\n"
+             "        float2(0.0, 1.0),\n"
+             "        float2(0.0, 1.0),\n"
+             "        float2(1.0, 0.0),\n"
+             "        float2(1.0, 1.0)\n"
+             "    };\n"
+             "    VSOut out;\n"
+             "    out.position = float4(pos[vid], 0.0, 1.0);\n"
+             "    out.uv = uv[vid];\n"
+             "    return out;\n"
+             "}\n"
+             "\n"
+             "fragment float4 rsdkOffscreenFragment(\n"
+             "    VSOut in [[stage_in]],\n"
+             "    texture2d<float> src [[texture(0)]],\n"
+             "    sampler samp [[sampler(0)]]) {\n"
+             "    float2 texel = 1.0 / float2(src.get_width(), src.get_height());\n"
+             "\n"
+             "    float4 c = src.sample(samp, in.uv) * 0.20;\n"
+             "\n"
+             "    c += src.sample(samp, in.uv + texel * float2( 4.0,  0.0)) * 0.10;\n"
+             "    c += src.sample(samp, in.uv + texel * float2(-4.0,  0.0)) * 0.10;\n"
+             "    c += src.sample(samp, in.uv + texel * float2( 0.0,  4.0)) * 0.10;\n"
+             "    c += src.sample(samp, in.uv + texel * float2( 0.0, -4.0)) * 0.10;\n"
+             "\n"
+             "    c += src.sample(samp, in.uv + texel * float2( 3.0,  3.0)) * 0.10;\n"
+             "    c += src.sample(samp, in.uv + texel * float2(-3.0,  3.0)) * 0.10;\n"
+             "    c += src.sample(samp, in.uv + texel * float2( 3.0, -3.0)) * 0.10;\n"
+             "    c += src.sample(samp, in.uv + texel * float2(-3.0, -3.0)) * 0.10;\n"
+             "\n"
+             "    return c;\n"
+             "}\n";
+
+        NSError *error = nil;
+        id<MTLLibrary> library =
+            [layer.device newLibraryWithSource:shaderSource
+                                       options:nil
+                                         error:&error];
+
+        if (library) {
+            id<MTLFunction> vertexFunction =
+                [library newFunctionWithName:@"rsdkOffscreenVertex"];
+            id<MTLFunction> fragmentFunction =
+                [library newFunctionWithName:@"rsdkOffscreenFragment"];
+
+            if (vertexFunction && fragmentFunction) {
+                MTLRenderPipelineDescriptor *desc =
+                    [[MTLRenderPipelineDescriptor alloc] init];
+
+                desc.label = @"RSDKv4 CRT Offscreen Copy";
+                desc.vertexFunction = vertexFunction;
+                desc.fragmentFunction = fragmentFunction;
+                desc.colorAttachments[0].pixelFormat = layer.pixelFormat;
+
+                pipeline =
+                    [layer.device newRenderPipelineStateWithDescriptor:desc
+                                                                error:&error];
+            }
+        }
+
+        MTLSamplerDescriptor *samplerDesc =
+            [[MTLSamplerDescriptor alloc] init];
+        samplerDesc.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDesc.magFilter = MTLSamplerMinMagFilterLinear;
+        samplerDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
+
+        sampler = [layer.device newSamplerStateWithDescriptor:samplerDesc];
+    }
+
+    if (!offscreenTexture || !pipeline || !sampler)
+        return NULL;
+
+    MTLRenderPassDescriptor *pass =
+        [MTLRenderPassDescriptor renderPassDescriptor];
+
+    pass.colorAttachments[0].texture = offscreenTexture;
+    pass.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+    pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+    id<MTLRenderCommandEncoder> encoder =
+        [commandBuffer renderCommandEncoderWithDescriptor:pass];
+
+    if (!encoder)
+        return NULL;
+
+    MTLViewport viewport;
+    viewport.originX = 0.0;
+    viewport.originY = 0.0;
+    viewport.width = width;
+    viewport.height = height;
+    viewport.znear = 0.0;
+    viewport.zfar = 1.0;
+
+    MTLScissorRect scissor;
+    scissor.x = 0;
+    scissor.y = 0;
+    scissor.width = width;
+    scissor.height = height;
+
+    encoder.label = @"RSDKv4 CRT Offscreen Copy";
+    [encoder setViewport:viewport];
+    [encoder setScissorRect:scissor];
+    [encoder setRenderPipelineState:pipeline];
+    [encoder setFragmentTexture:sourceTexture atIndex:0];
+    [encoder setFragmentSamplerState:sampler atIndex:0];
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangle
+                vertexStart:0
+                vertexCount:6];
+    [encoder endEncoding];
+
+    return (__bridge void *)offscreenTexture;
+}
+
 void metalTextureProbe(void *texturePtr)
 {
     static bool checked = false;
