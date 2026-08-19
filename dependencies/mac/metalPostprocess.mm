@@ -328,9 +328,10 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder popDebugGroup];
 }
 
-void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
+void metalCompositeProbe(void *encoderPtr, void *layerPtr,
+                         void *texturePtr, void *diffuseTexturePtr)
 {
-    if (!encoderPtr || !layerPtr || !texturePtr)
+    if (!encoderPtr || !layerPtr || !texturePtr || !diffuseTexturePtr)
         return;
 
     id<MTLRenderCommandEncoder> encoder =
@@ -339,6 +340,8 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
         (__bridge CAMetalLayer *)layerPtr;
     id<MTLTexture> texture =
         (__bridge id<MTLTexture>)texturePtr;
+    id<MTLTexture> diffuseTexture =
+        (__bridge id<MTLTexture>)diffuseTexturePtr;
 
     static id<MTLRenderPipelineState> pipeline = nil;
     static id<MTLSamplerState> sampler = nil;
@@ -381,10 +384,14 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "\n"
              "fragment float4 rsdkCompositeFragment(\n"
              "    VSOut in [[stage_in]],\n"
-             "    texture2d<float> src [[texture(0)]],\n"
+             "    texture2d<float> narrowSrc [[texture(0)]],\n"
+             "    texture2d<float> wideSrc [[texture(1)]],\n"
              "    sampler samp [[sampler(0)]]) {\n"
-             "    float4 glow = src.sample(samp, in.uv);\n"
-             "    glow.rgb *= 0.12;\n"
+             "    float3 narrowGlow = narrowSrc.sample(samp, in.uv).rgb;\n"
+             "    float3 wideGlow = wideSrc.sample(samp, in.uv).rgb;\n"
+             "\n"
+             "    float4 glow;\n"
+             "    glow.rgb = narrowGlow * 0.10 + wideGlow * 0.04;\n"
              "    glow.a = 1.0;\n"
              "    return glow;\n"
              "}\n";
@@ -457,6 +464,7 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder setScissorRect:scissor];
     [encoder setRenderPipelineState:pipeline];
     [encoder setFragmentTexture:texture atIndex:0];
+    [encoder setFragmentTexture:diffuseTexture atIndex:1];
     [encoder setFragmentSamplerState:sampler atIndex:0];
     [encoder drawPrimitives:MTLPrimitiveTypeTriangle
                 vertexStart:0
@@ -464,8 +472,12 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder popDebugGroup];
 }
 
-void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *texturePtr)
+void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr,
+                          void *texturePtr, void **diffuseTextureOut)
 {
+    if (diffuseTextureOut)
+        *diffuseTextureOut = NULL;
+
     if (!commandBufferPtr || !layerPtr || !texturePtr)
         return NULL;
 
@@ -477,11 +489,15 @@ void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *textureP
         (__bridge id<MTLTexture>)texturePtr;
 
     static id<MTLTexture> offscreenTexture = nil;
+    static id<MTLTexture> diffuseTexture = nil;
     static id<MTLRenderPipelineState> pipeline = nil;
     static id<MTLSamplerState> sampler = nil;
     static NSUInteger offscreenWidth = 0;
     static NSUInteger offscreenHeight = 0;
+    static NSUInteger diffuseWidth = 0;
+    static NSUInteger diffuseHeight = 0;
     static MTLPixelFormat offscreenFormat = MTLPixelFormatInvalid;
+    static MTLPixelFormat diffuseFormat = MTLPixelFormatInvalid;
     static bool attemptedPipeline = false;
 
     NSUInteger width =
@@ -512,6 +528,35 @@ void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *textureP
         offscreenWidth = width;
         offscreenHeight = height;
         offscreenFormat = layer.pixelFormat;
+    }
+
+    NSUInteger wideWidth = MAX((NSUInteger)1, width / 4);
+    NSUInteger wideHeight = MAX((NSUInteger)1, height / 4);
+
+    if (!diffuseTexture ||
+        diffuseWidth != wideWidth ||
+        diffuseHeight != wideHeight ||
+        diffuseFormat != layer.pixelFormat) {
+
+        MTLTextureDescriptor *diffuseDesc =
+            [MTLTextureDescriptor
+                texture2DDescriptorWithPixelFormat:layer.pixelFormat
+                                             width:wideWidth
+                                            height:wideHeight
+                                         mipmapped:NO];
+
+        diffuseDesc.storageMode = MTLStorageModePrivate;
+        diffuseDesc.usage =
+            MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+
+        diffuseTexture =
+            [layer.device newTextureWithDescriptor:diffuseDesc];
+
+        diffuseTexture.label = @"RSDKv4 CRT Wide Diffusion";
+
+        diffuseWidth = wideWidth;
+        diffuseHeight = wideHeight;
+        diffuseFormat = layer.pixelFormat;
     }
 
     if (!attemptedPipeline) {
@@ -611,7 +656,7 @@ void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *textureP
         sampler = [layer.device newSamplerStateWithDescriptor:samplerDesc];
     }
 
-    if (!offscreenTexture || !pipeline || !sampler)
+    if (!offscreenTexture || !diffuseTexture || !pipeline || !sampler)
         return NULL;
 
     MTLRenderPassDescriptor *pass =
@@ -651,6 +696,47 @@ void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr, void *textureP
                 vertexStart:0
                 vertexCount:6];
     [encoder endEncoding];
+
+    MTLRenderPassDescriptor *diffusePass =
+        [MTLRenderPassDescriptor renderPassDescriptor];
+
+    diffusePass.colorAttachments[0].texture = diffuseTexture;
+    diffusePass.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+    diffusePass.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+    id<MTLRenderCommandEncoder> diffuseEncoder =
+        [commandBuffer renderCommandEncoderWithDescriptor:diffusePass];
+
+    if (!diffuseEncoder)
+        return NULL;
+
+    MTLViewport diffuseViewport;
+    diffuseViewport.originX = 0.0;
+    diffuseViewport.originY = 0.0;
+    diffuseViewport.width = wideWidth;
+    diffuseViewport.height = wideHeight;
+    diffuseViewport.znear = 0.0;
+    diffuseViewport.zfar = 1.0;
+
+    MTLScissorRect diffuseScissor;
+    diffuseScissor.x = 0;
+    diffuseScissor.y = 0;
+    diffuseScissor.width = wideWidth;
+    diffuseScissor.height = wideHeight;
+
+    diffuseEncoder.label = @"RSDKv4 CRT Wide Diffusion";
+    [diffuseEncoder setViewport:diffuseViewport];
+    [diffuseEncoder setScissorRect:diffuseScissor];
+    [diffuseEncoder setRenderPipelineState:pipeline];
+    [diffuseEncoder setFragmentTexture:offscreenTexture atIndex:0];
+    [diffuseEncoder setFragmentSamplerState:sampler atIndex:0];
+    [diffuseEncoder drawPrimitives:MTLPrimitiveTypeTriangle
+                       vertexStart:0
+                       vertexCount:6];
+    [diffuseEncoder endEncoding];
+
+    if (diffuseTextureOut)
+        *diffuseTextureOut = (__bridge void *)diffuseTexture;
 
     return (__bridge void *)offscreenTexture;
 }

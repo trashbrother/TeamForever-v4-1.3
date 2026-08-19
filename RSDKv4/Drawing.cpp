@@ -539,8 +539,13 @@ void FlipScreen()
 
         if (metalCommandBuffer) {
             SDL_RenderEndMetalCommandEncoder(Engine.renderer);
+
+            void *metalDiffuseTexture = nullptr;
             void *metalOffscreenTexture =
-                metalMultipassProbe(metalCommandBuffer, metalLayer, metalTexture);
+                metalMultipassProbe(metalCommandBuffer,
+                                    metalLayer,
+                                    metalTexture,
+                                    &metalDiffuseTexture);
 
             SDL_RenderResumeMetalCommandEncoder(Engine.renderer);
 
@@ -550,7 +555,8 @@ void FlipScreen()
             metalPostprocessProbe(metalCompositeEncoder);
             metalCompositeProbe(metalCompositeEncoder,
                                 metalLayer,
-                                metalOffscreenTexture);
+                                metalOffscreenTexture,
+                                metalDiffuseTexture);
         }
 #endif
         SDL_RenderPresent(Engine.renderer);
