@@ -1,9 +1,30 @@
 --- a/include/SDL_render.h
 +++ b/include/SDL_render.h
-@@ -1911,6 +1911,16 @@
+@@ -1911,6 +1911,37 @@
  extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandEncoder(SDL_Renderer * renderer);
  
  /**
++ * Get the Metal command buffer for the current frame.
++ *
++ * This is a local macOS extension used by the RSDKv4 Metal postprocessor.
++ *
++ * \param renderer the renderer to query.
++ * \returns an `id<MTLCommandBuffer>` cast to `void *`, or NULL if unavailable.
++ */
++extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandBuffer(SDL_Renderer * renderer);
++
++/**
++ * End SDL's active Metal render command encoder without committing the
++ * current command buffer.
++ *
++ * This is a local macOS extension used by the RSDKv4 Metal postprocessor.
++ *
++ * \param renderer the renderer whose active Metal encoder should be ended.
++ */
++extern DECLSPEC void SDLCALL SDL_RenderEndMetalCommandEncoder(SDL_Renderer * renderer);
++extern DECLSPEC int SDLCALL SDL_RenderResumeMetalCommandEncoder(SDL_Renderer * renderer);
++
++/**
 + * Get the native Metal texture associated with an SDL_Texture.
 + *
 + * This is a local macOS extension used by the RSDKv4 Metal postprocessor.
@@ -53,24 +74,114 @@
  static int IsMetalAvailable(const SDL_SysWMinfo *syswm)
  {
      if (syswm->subsystem != SDL_SYSWM_COCOA && syswm->subsystem != SDL_SYSWM_UIKIT) {
+@@ -1532,6 +1559,80 @@
+     return (__bridge void*)data.mtlcmdencoder;
+ }}
+ 
++void *SDLCALL SDL_RenderGetMetalCommandBuffer(SDL_Renderer *renderer)
++{
++    METAL_RenderData *data;
++
++    @autoreleasepool {
++        if (renderer == NULL || renderer->driverdata == NULL) {
++            return NULL;
++        }
++
++        METAL_ActivateRenderCommandEncoder(renderer, MTLLoadActionLoad, NULL, nil);
++        data = (__bridge METAL_RenderData *)renderer->driverdata;
++
++        if (data.mtlcmdbuffer == nil) {
++            return NULL;
++        }
++
++        return (__bridge void *)data.mtlcmdbuffer;
++    }
++}
++
++void SDLCALL SDL_RenderEndMetalCommandEncoder(SDL_Renderer *renderer)
++{
++    METAL_RenderData *data;
++
++    @autoreleasepool {
++        if (renderer == NULL || renderer->driverdata == NULL) {
++            return;
++        }
++
++        data = (__bridge METAL_RenderData *)renderer->driverdata;
++
++        if (data.mtlcmdencoder != nil) {
++            [data.mtlcmdencoder endEncoding];
++            data.mtlcmdencoder = nil;
++        }
++    }
++}
++
++int SDLCALL SDL_RenderResumeMetalCommandEncoder(SDL_Renderer *renderer)
++{
++    METAL_RenderData *data;
++
++    @autoreleasepool {
++        if (renderer == NULL || renderer->driverdata == NULL) {
++            return -1;
++        }
++
++        data = (__bridge METAL_RenderData *)renderer->driverdata;
++
++        if (data.mtlcmdencoder != nil) {
++            return 0;
++        }
++
++        if (data.mtlcmdbuffer == nil ||
++            data.mtlpassdesc.colorAttachments[0].texture == nil) {
++            return -1;
++        }
++
++        data.mtlpassdesc.colorAttachments[0].loadAction = MTLLoadActionLoad;
++
++        data.mtlcmdencoder =
++            [data.mtlcmdbuffer
++                renderCommandEncoderWithDescriptor:data.mtlpassdesc];
++
++        if (data.mtlcmdencoder == nil) {
++            return -1;
++        }
++
++        data.mtlcmdencoder.label = @"SDL metal renderer resumed backbuffer";
++
++        return 0;
++    }
++}
++
+ static int METAL_SetVSync(SDL_Renderer * renderer, const int vsync)
+ {
+ #if (defined(__MACOSX__) && defined(MAC_OS_X_VERSION_10_13)) || TARGET_OS_MACCATALYST
 --- a/src/dynapi/SDL2.exports
 +++ b/src/dynapi/SDL2.exports
-@@ -872,3 +872,4 @@
+@@ -872,3 +872,7 @@
  ++'_SDL_DestroyWindowSurface'.'SDL2.dll'.'SDL_DestroyWindowSurface'
  # ++'_SDL_GDKGetDefaultUser'.'SDL2.dll'.'SDL_GDKGetDefaultUser'
  ++'_SDL_GameControllerGetSteamHandle'.'SDL2.dll'.'SDL_GameControllerGetSteamHandle'
 +++'_SDL_RenderGetMetalTexture'.'SDL2.dll'.'SDL_RenderGetMetalTexture'
++++'_SDL_RenderGetMetalCommandBuffer'.'SDL2.dll'.'SDL_RenderGetMetalCommandBuffer'
++++'_SDL_RenderEndMetalCommandEncoder'.'SDL2.dll'.'SDL_RenderEndMetalCommandEncoder'
++++'_SDL_RenderResumeMetalCommandEncoder'.'SDL2.dll'.'SDL_RenderResumeMetalCommandEncoder'
 --- a/src/dynapi/SDL_dynapi_overrides.h
 +++ b/src/dynapi/SDL_dynapi_overrides.h
-@@ -898,3 +898,4 @@
+@@ -898,3 +898,7 @@
  #define SDL_DestroyWindowSurface SDL_DestroyWindowSurface_REAL
  #define SDL_GDKGetDefaultUser SDL_GDKGetDefaultUser_REAL
  #define SDL_GameControllerGetSteamHandle SDL_GameControllerGetSteamHandle_REAL
 +#define SDL_RenderGetMetalTexture SDL_RenderGetMetalTexture_REAL
++#define SDL_RenderGetMetalCommandBuffer SDL_RenderGetMetalCommandBuffer_REAL
++#define SDL_RenderEndMetalCommandEncoder SDL_RenderEndMetalCommandEncoder_REAL
++#define SDL_RenderResumeMetalCommandEncoder SDL_RenderResumeMetalCommandEncoder_REAL
 --- a/src/dynapi/SDL_dynapi_procs.h
 +++ b/src/dynapi/SDL_dynapi_procs.h
-@@ -985,3 +985,4 @@
+@@ -985,3 +985,7 @@
  SDL_DYNAPI_PROC(int,SDL_GDKGetDefaultUser,(XUserHandle *a),(a),return)
  #endif
  SDL_DYNAPI_PROC(Uint64,SDL_GameControllerGetSteamHandle,(SDL_GameController *a),(a),return)
 +SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalTexture,(SDL_Texture *a),(a),return)
++SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalCommandBuffer,(SDL_Renderer *a),(a),return)
++SDL_DYNAPI_PROC(void,SDL_RenderEndMetalCommandEncoder,(SDL_Renderer *a),(a),)
++SDL_DYNAPI_PROC(int,SDL_RenderResumeMetalCommandEncoder,(SDL_Renderer *a),(a),return)

@@ -533,6 +533,14 @@ void FlipScreen()
         metalPostprocessProbe(metalEncoder);
         metalLayerProbe(metalLayer);
         metalCopyProbe(metalEncoder, metalLayer, metalTexture);
+
+        void *metalCommandBuffer =
+            SDL_RenderGetMetalCommandBuffer(Engine.renderer);
+
+        if (metalCommandBuffer) {
+            SDL_RenderEndMetalCommandEncoder(Engine.renderer);
+            SDL_RenderResumeMetalCommandEncoder(Engine.renderer);
+        }
 #endif
         SDL_RenderPresent(Engine.renderer);
     }
