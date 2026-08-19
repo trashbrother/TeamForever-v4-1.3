@@ -187,7 +187,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    float maskStrength = 0.18;\n"
              "\n"
              "    float subpixelX = fmod(maskX, 2.0);\n"
-             "    float aperture = (subpixelX < 1.0) ? 1.0 : 0.92;\n"
+             "    float aperture = (subpixelX < 1.0) ? 0.94 : 1.0;\n"
              "\n"
              "    float3 mask = float3(1.0 - maskStrength);\n"
              "\n"
