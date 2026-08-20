@@ -219,7 +219,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    float2 outputPixel = floor(in.position.xy);\n"
              "    float maskX = fmod(outputPixel.x, 6.0);\n"
              "    float maskY = fmod(outputPixel.y, 2.0);\n"
-             "    float maskStrength = 0.18;\n"
+             "    float maskStrength = mix(0.18, 0.11, smoothstep(0.55, 1.0, shapedLuma));\n"
              "\n"
              "    float subpixelX = fmod(maskX, 2.0);\n"
              "    float aperture = (subpixelX < 1.0) ? 0.94 : 1.0;\n"
