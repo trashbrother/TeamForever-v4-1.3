@@ -3,6 +3,7 @@
 
 void metalPostprocessProbe(void *encoder);
 void metalTextureProbe(void *texture);
+void metalRenderTargetProbe(void *texture);
 void metalLayerProbe(void *layer);
 void metalCopyProbe(void *encoder, void *layer, void *texture);
 void metalCompositeProbe(void *encoder, void *layer,

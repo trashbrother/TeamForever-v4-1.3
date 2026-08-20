@@ -1,6 +1,6 @@
 --- a/include/SDL_render.h
 +++ b/include/SDL_render.h
-@@ -1911,6 +1911,37 @@
+@@ -1911,6 +1911,47 @@
  extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandEncoder(SDL_Renderer * renderer);
  
  /**
@@ -12,6 +12,16 @@
 + * \returns an `id<MTLCommandBuffer>` cast to `void *`, or NULL if unavailable.
 + */
 +extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandBuffer(SDL_Renderer * renderer);
++
++/**
++ * Get the Metal texture currently used as SDL's render target.
++ *
++ * This is a local macOS extension used by the RSDKv4 Metal postprocessor.
++ *
++ * \param renderer the renderer to query.
++ * \returns an `id<MTLTexture>` cast to `void *`, or NULL if unavailable.
++ */
++extern DECLSPEC void *SDLCALL SDL_RenderGetMetalRenderTargetTexture(SDL_Renderer * renderer);
 +
 +/**
 + * End SDL's active Metal render command encoder without committing the
@@ -74,7 +84,7 @@
  static int IsMetalAvailable(const SDL_SysWMinfo *syswm)
  {
      if (syswm->subsystem != SDL_SYSWM_COCOA && syswm->subsystem != SDL_SYSWM_UIKIT) {
-@@ -1532,6 +1559,80 @@
+@@ -1532,6 +1559,99 @@
      return (__bridge void*)data.mtlcmdencoder;
  }}
  
@@ -95,6 +105,25 @@
 +        }
 +
 +        return (__bridge void *)data.mtlcmdbuffer;
++    }
++}
++
++void *SDLCALL SDL_RenderGetMetalRenderTargetTexture(SDL_Renderer *renderer)
++{
++    METAL_RenderData *data;
++
++    @autoreleasepool {
++        if (renderer == NULL || renderer->driverdata == NULL) {
++            return NULL;
++        }
++
++        data = (__bridge METAL_RenderData *)renderer->driverdata;
++
++        if (data.mtlpassdesc.colorAttachments[0].texture == nil) {
++            return NULL;
++        }
++
++        return (__bridge void *)data.mtlpassdesc.colorAttachments[0].texture;
 +    }
 +}
 +
@@ -157,31 +186,34 @@
  #if (defined(__MACOSX__) && defined(MAC_OS_X_VERSION_10_13)) || TARGET_OS_MACCATALYST
 --- a/src/dynapi/SDL2.exports
 +++ b/src/dynapi/SDL2.exports
-@@ -872,3 +872,7 @@
+@@ -872,3 +872,8 @@
  ++'_SDL_DestroyWindowSurface'.'SDL2.dll'.'SDL_DestroyWindowSurface'
  # ++'_SDL_GDKGetDefaultUser'.'SDL2.dll'.'SDL_GDKGetDefaultUser'
  ++'_SDL_GameControllerGetSteamHandle'.'SDL2.dll'.'SDL_GameControllerGetSteamHandle'
 +++'_SDL_RenderGetMetalTexture'.'SDL2.dll'.'SDL_RenderGetMetalTexture'
 +++'_SDL_RenderGetMetalCommandBuffer'.'SDL2.dll'.'SDL_RenderGetMetalCommandBuffer'
++++'_SDL_RenderGetMetalRenderTargetTexture'.'SDL2.dll'.'SDL_RenderGetMetalRenderTargetTexture'
 +++'_SDL_RenderEndMetalCommandEncoder'.'SDL2.dll'.'SDL_RenderEndMetalCommandEncoder'
 +++'_SDL_RenderResumeMetalCommandEncoder'.'SDL2.dll'.'SDL_RenderResumeMetalCommandEncoder'
 --- a/src/dynapi/SDL_dynapi_overrides.h
 +++ b/src/dynapi/SDL_dynapi_overrides.h
-@@ -898,3 +898,7 @@
+@@ -898,3 +898,8 @@
  #define SDL_DestroyWindowSurface SDL_DestroyWindowSurface_REAL
  #define SDL_GDKGetDefaultUser SDL_GDKGetDefaultUser_REAL
  #define SDL_GameControllerGetSteamHandle SDL_GameControllerGetSteamHandle_REAL
 +#define SDL_RenderGetMetalTexture SDL_RenderGetMetalTexture_REAL
 +#define SDL_RenderGetMetalCommandBuffer SDL_RenderGetMetalCommandBuffer_REAL
++#define SDL_RenderGetMetalRenderTargetTexture SDL_RenderGetMetalRenderTargetTexture_REAL
 +#define SDL_RenderEndMetalCommandEncoder SDL_RenderEndMetalCommandEncoder_REAL
 +#define SDL_RenderResumeMetalCommandEncoder SDL_RenderResumeMetalCommandEncoder_REAL
 --- a/src/dynapi/SDL_dynapi_procs.h
 +++ b/src/dynapi/SDL_dynapi_procs.h
-@@ -985,3 +985,7 @@
+@@ -985,3 +985,8 @@
  SDL_DYNAPI_PROC(int,SDL_GDKGetDefaultUser,(XUserHandle *a),(a),return)
  #endif
  SDL_DYNAPI_PROC(Uint64,SDL_GameControllerGetSteamHandle,(SDL_GameController *a),(a),return)
 +SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalTexture,(SDL_Texture *a),(a),return)
 +SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalCommandBuffer,(SDL_Renderer *a),(a),return)
++SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalRenderTargetTexture,(SDL_Renderer *a),(a),return)
 +SDL_DYNAPI_PROC(void,SDL_RenderEndMetalCommandEncoder,(SDL_Renderer *a),(a),)
 +SDL_DYNAPI_PROC(int,SDL_RenderResumeMetalCommandEncoder,(SDL_Renderer *a),(a),return)

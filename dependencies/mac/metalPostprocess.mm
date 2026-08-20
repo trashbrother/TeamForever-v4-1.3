@@ -743,6 +743,39 @@ void *metalMultipassProbe(void *commandBufferPtr, void *layerPtr,
     return (__bridge void *)offscreenTexture;
 }
 
+void metalRenderTargetProbe(void *texturePtr)
+{
+    static bool checked = false;
+
+    if (checked)
+        return;
+
+    FILE *f = fopen("/tmp/rsdkv4-metal-render-target.txt", "w");
+    if (!f)
+        return;
+
+    if (!texturePtr) {
+        fprintf(f, "renderTarget: NULL\n");
+    }
+    else {
+        id<MTLTexture> texture =
+            (__bridge id<MTLTexture>)texturePtr;
+
+        fprintf(f, "renderTarget: non-null\n");
+        fprintf(f, "width: %lu\n",
+                (unsigned long)texture.width);
+        fprintf(f, "height: %lu\n",
+                (unsigned long)texture.height);
+        fprintf(f, "pixelFormat: %lu\n",
+                (unsigned long)texture.pixelFormat);
+        fprintf(f, "framebufferOnly: %d\n",
+                texture.framebufferOnly ? 1 : 0);
+    }
+
+    fclose(f);
+    checked = true;
+}
+
 void metalTextureProbe(void *texturePtr)
 {
     static bool checked = false;

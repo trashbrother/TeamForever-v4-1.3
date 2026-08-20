@@ -534,6 +534,10 @@ void FlipScreen()
         metalLayerProbe(metalLayer);
         metalCopyProbe(metalEncoder, metalLayer, metalTexture);
 
+        void *metalRenderTarget =
+            SDL_RenderGetMetalRenderTargetTexture(Engine.renderer);
+        metalRenderTargetProbe(metalRenderTarget);
+
         void *metalCommandBuffer =
             SDL_RenderGetMetalCommandBuffer(Engine.renderer);
 
@@ -544,7 +548,7 @@ void FlipScreen()
             void *metalOffscreenTexture =
                 metalMultipassProbe(metalCommandBuffer,
                                     metalLayer,
-                                    metalTexture,
+                                    metalRenderTarget,
                                     &metalDiffuseTexture);
 
             SDL_RenderResumeMetalCommandEncoder(Engine.renderer);
