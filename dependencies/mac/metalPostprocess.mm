@@ -190,7 +190,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    float baseEnergy0 = clamp(dot(color0.rgb, float3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);\n"
              "    float baseEnergy1 = clamp(dot(color1.rgb, float3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);\n"
              "\n"
-             "    float2 focusPos = in.uv * 2.0 - 1.0;\n"
+             "    float2 focusPos = warpedUV * 2.0 - 1.0;\n"
              "    float focusRadius = clamp(dot(focusPos, focusPos), 0.0, 1.0);\n"
              "    float edgeFocus = 0.015 * focusRadius;\n"
              "\n"
