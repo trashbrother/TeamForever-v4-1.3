@@ -5,6 +5,19 @@
 #include <stdio.h>
 #include "metalPostprocess.hpp"
 
+const CRTSettings crtDefaultSettings = {
+    true, // enabled
+    1.0f, // curvature
+    1.0f, // beam
+    1.0f, // mask
+    1.0f, // bloom
+    1.0f, // convergence
+    1.0f  // vignette
+};
+
+CRTSettings crtSettings      = crtDefaultSettings;
+CRTSettings crtSavedSettings = crtDefaultSettings;
+
 void metalPostprocessProbe(void *encoderPtr)
 {
     if (!encoderPtr)

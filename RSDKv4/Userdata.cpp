@@ -1,5 +1,107 @@
 #include "RetroEngine.hpp"
 
+#if RETRO_PLATFORM == RETRO_OSX
+#include "metalPostprocess.hpp"
+
+#include <cerrno>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <strings.h>
+
+static char *TrimCRTValue(char *value)
+{
+    while (*value == ' ' || *value == '\t')
+        ++value;
+
+    char *end = value + std::strlen(value);
+    while (end > value && (end[-1] == ' ' || end[-1] == '\t'))
+        --end;
+
+    *end = '\0';
+    return value;
+}
+
+static bool ReadCRTIntensity(IniParser &ini, const char *key, float *dest)
+{
+    char value[0x100];
+
+    if (!ini.GetString("CRT", key, value))
+        return false;
+
+    char *start = TrimCRTValue(value);
+    char *end   = nullptr;
+
+    errno = 0;
+    float parsed = std::strtof(start, &end);
+
+    if (end == start || *end != '\0' || errno == ERANGE ||
+        !std::isfinite(parsed) || parsed < 0.0f || parsed > 2.0f)
+        return false;
+
+    *dest = parsed;
+    return true;
+}
+
+static bool ReadCRTEnabled(IniParser &ini, bool *dest)
+{
+    char value[0x100];
+
+    if (!ini.GetString("CRT", "Enabled", value))
+        return false;
+
+    char *parsed = TrimCRTValue(value);
+
+    if (!strcasecmp(parsed, "true") || !std::strcmp(parsed, "1")) {
+        *dest = true;
+        return true;
+    }
+
+    if (!strcasecmp(parsed, "false") || !std::strcmp(parsed, "0")) {
+        *dest = false;
+        return true;
+    }
+
+    return false;
+}
+
+static CRTSettings ReadCRTSettingsFromIni(IniParser &ini)
+{
+    CRTSettings settings = crtDefaultSettings;
+
+    ReadCRTEnabled(ini, &settings.enabled);
+    ReadCRTIntensity(ini, "Curvature", &settings.curvature);
+    ReadCRTIntensity(ini, "Beam", &settings.beam);
+    ReadCRTIntensity(ini, "Mask", &settings.mask);
+    ReadCRTIntensity(ini, "Bloom", &settings.bloom);
+    ReadCRTIntensity(ini, "Convergence", &settings.convergence);
+    ReadCRTIntensity(ini, "Vignette", &settings.vignette);
+
+    return settings;
+}
+
+static void SetCRTSettingsInIni(IniParser &ini, const CRTSettings &settings,
+                                bool includeComments)
+{
+    if (includeComments) {
+        ini.SetComment(
+            "CRT", "RangeComment",
+            "CRT effect intensities use the range 0.00-2.00: 0.00 = disabled, 1.00 = calibrated default, 2.00 = maximum intensity.");
+        ini.SetComment(
+            "CRT", "EnabledComment",
+            "Set Enabled to false to bypass the complete CRT post-processing effect.");
+    }
+
+    ini.SetBool("CRT", "Enabled", settings.enabled);
+    ini.SetFloat("CRT", "Curvature", settings.curvature);
+    ini.SetFloat("CRT", "Beam", settings.beam);
+    ini.SetFloat("CRT", "Mask", settings.mask);
+    ini.SetFloat("CRT", "Bloom", settings.bloom);
+    ini.SetFloat("CRT", "Convergence", settings.convergence);
+    ini.SetFloat("CRT", "Vignette", settings.vignette);
+}
+#endif
+
 // Your guess is as good as mine
 #if RETRO_PLATFORM == RETRO_SWITCH
 long pathconf (const char *__path, int __name) {
@@ -307,6 +409,12 @@ void InitUserdata()
         ini.SetFloat("Audio", "BGMVolume", bgmVolume / (float)MAX_VOLUME);
         ini.SetFloat("Audio", "SFXVolume", sfxVolume / (float)MAX_VOLUME);
 
+#if RETRO_PLATFORM == RETRO_OSX
+        crtSavedSettings = crtDefaultSettings;
+        crtSettings      = crtSavedSettings;
+        SetCRTSettingsInIni(ini, crtSavedSettings, true);
+#endif
+
 #if RETRO_USING_SDL2
         ini.SetInteger("Keyboard 1", "Up", inputDevice[INPUT_UP].keyMappings = SDL_SCANCODE_UP);
         ini.SetInteger("Keyboard 1", "Down", inputDevice[INPUT_DOWN].keyMappings = SDL_SCANCODE_DOWN);
@@ -466,6 +574,11 @@ void InitUserdata()
             Engine.dimLimit = 300; // 5 mins
         if (Engine.dimLimit >= 0)
             Engine.dimLimit *= Engine.refreshRate;
+
+#if RETRO_PLATFORM == RETRO_OSX
+        crtSavedSettings = ReadCRTSettingsFromIni(ini);
+        crtSettings      = crtSavedSettings;
+#endif
 
         float bv = 0, sv = 0;
         if (!ini.GetFloat("Audio", "BGMVolume", &bv))
@@ -741,6 +854,10 @@ void WriteSettings()
     ini.SetInteger("Window", "RefreshRate", Engine.refreshRate);
     ini.SetComment("Window", "DLComment", "Determines the dim timer in seconds, set to -1 to disable dimming");
     ini.SetInteger("Window", "DimLimit", Engine.dimLimit >= 0 ? Engine.dimLimit / Engine.refreshRate : -1);
+
+#if RETRO_PLATFORM == RETRO_OSX
+    SetCRTSettingsInIni(ini, crtSavedSettings, true);
+#endif
 
     ini.SetFloat("Audio", "BGMVolume", bgmVolume / (float)MAX_VOLUME);
     ini.SetFloat("Audio", "SFXVolume", sfxVolume / (float)MAX_VOLUME);
