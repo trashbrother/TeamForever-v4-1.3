@@ -5,9 +5,14 @@
 
 #include <cerrno>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include <strings.h>
+#include <sys/stat.h>
 
 static char *TrimCRTValue(char *value)
 {
@@ -86,7 +91,10 @@ static void SetCRTSettingsInIni(IniParser &ini, const CRTSettings &settings,
     if (includeComments) {
         ini.SetComment(
             "CRT", "RangeComment",
-            "CRT effect intensities use the range 0.00-2.00: 0.00 = disabled, 1.00 = calibrated default, 2.00 = maximum intensity.");
+            "CRT effect intensities use the range 0.00-2.00.");
+        ini.SetComment(
+            "CRT", "MeaningComment",
+            "0.00 = effect disabled, 1.00 = calibrated default, 2.00 = maximum intensity.");
         ini.SetComment(
             "CRT", "EnabledComment",
             "Set Enabled to false to bypass the complete CRT post-processing effect.");
@@ -99,6 +107,217 @@ static void SetCRTSettingsInIni(IniParser &ini, const CRTSettings &settings,
     ini.SetFloat("CRT", "Bloom", settings.bloom);
     ini.SetFloat("CRT", "Convergence", settings.convergence);
     ini.SetFloat("CRT", "Vignette", settings.vignette);
+}
+
+static void GetCRTSettingsPath(char *path, size_t pathSize)
+{
+    std::snprintf(path, pathSize, "%ssettings.ini", gamePath);
+}
+
+static std::string TrimCRTLine(const std::string &line)
+{
+    size_t first = line.find_first_not_of(" \t\r");
+    if (first == std::string::npos)
+        return "";
+
+    size_t last = line.find_last_not_of(" \t\r");
+    return line.substr(first, last - first + 1);
+}
+
+static bool IsIniSectionHeader(const std::string &line)
+{
+    std::string trimmed = TrimCRTLine(line);
+    return trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']';
+}
+
+static std::string BuildCRTSettingsBlock(const CRTSettings &settings, const char *newline)
+{
+    char block[0x800];
+
+    std::snprintf(
+        block, sizeof(block),
+        "[CRT]%s"
+        "; CRT effect intensities use the range 0.00-2.00.%s"
+        "; 0.00 = effect disabled, 1.00 = calibrated default, 2.00 = maximum intensity.%s"
+        "; Set Enabled to false to bypass the complete CRT post-processing effect.%s"
+        "Enabled=%s%s"
+        "Curvature=%.6f%s"
+        "Beam=%.6f%s"
+        "Mask=%.6f%s"
+        "Bloom=%.6f%s"
+        "Convergence=%.6f%s"
+        "Vignette=%.6f",
+        newline,
+        newline,
+        newline,
+        newline,
+        settings.enabled ? "true" : "false", newline,
+        settings.curvature, newline,
+        settings.beam, newline,
+        settings.mask, newline,
+        settings.bloom, newline,
+        settings.convergence, newline,
+        settings.vignette);
+
+    return block;
+}
+
+static std::string UpdateCRTSection(const std::string &text, const CRTSettings &settings)
+{
+    const char *newline = text.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    std::string block   = BuildCRTSettingsBlock(settings, newline);
+
+    size_t crtStart = std::string::npos;
+    size_t crtEnd   = std::string::npos;
+    size_t pos      = 0;
+
+    while (pos < text.size()) {
+        size_t lineEnd = text.find('\n', pos);
+        size_t contentEnd = lineEnd == std::string::npos ? text.size() : lineEnd;
+
+        std::string line = text.substr(pos, contentEnd - pos);
+        std::string trimmed = TrimCRTLine(line);
+
+        if (crtStart == std::string::npos) {
+            if (trimmed == "[CRT]")
+                crtStart = pos;
+        }
+        else if (IsIniSectionHeader(line)) {
+            crtEnd = pos;
+            break;
+        }
+
+        if (lineEnd == std::string::npos)
+            break;
+
+        pos = lineEnd + 1;
+    }
+
+    if (crtStart != std::string::npos) {
+        if (crtEnd == std::string::npos)
+            crtEnd = text.size();
+
+        std::string updated = text.substr(0, crtStart);
+        updated += block;
+        updated += newline;
+
+        if (crtEnd < text.size())
+            updated += text.substr(crtEnd);
+
+        return updated;
+    }
+
+    std::string updated = text;
+
+    if (!updated.empty() && updated.back() != '\n')
+        updated += newline;
+
+    if (!updated.empty())
+        updated += newline;
+
+    updated += block;
+    updated += newline;
+
+    return updated;
+}
+
+bool SaveCRTSettings()
+{
+    char path[0x400];
+    GetCRTSettingsPath(path, sizeof(path));
+
+    struct stat fileInfo;
+
+    if (stat(path, &fileInfo) != 0) {
+        if (errno != ENOENT)
+            return false;
+
+        // No settings.ini at all: deliberately regenerate a complete
+        // Engine settings file, using the current live CRT state.
+        CRTSettings previousSavedSettings = crtSavedSettings;
+        crtSavedSettings = crtSettings;
+
+        WriteSettings();
+
+        std::ifstream verify(path, std::ios::binary);
+        if (!verify) {
+            crtSavedSettings = previousSavedSettings;
+            return false;
+        }
+
+        return true;
+    }
+
+    std::ifstream input(path, std::ios::binary);
+    if (!input)
+        return false;
+
+    std::ostringstream contents;
+    contents << input.rdbuf();
+
+    if (input.bad())
+        return false;
+
+    input.close();
+
+    std::string updated = UpdateCRTSection(contents.str(), crtSettings);
+    std::string tempPath = std::string(path) + ".crt.tmp";
+
+    {
+        std::ofstream output(tempPath, std::ios::binary | std::ios::trunc);
+        if (!output)
+            return false;
+
+        output.write(updated.data(), updated.size());
+        output.flush();
+
+        if (!output) {
+            output.close();
+            std::remove(tempPath.c_str());
+            return false;
+        }
+
+        output.close();
+
+        if (!output) {
+            std::remove(tempPath.c_str());
+            return false;
+        }
+    }
+
+    if (std::rename(tempPath.c_str(), path) != 0) {
+        std::remove(tempPath.c_str());
+        return false;
+    }
+
+    // Only a successful disk write advances the persisted snapshot.
+    crtSavedSettings = crtSettings;
+    return true;
+}
+
+bool ReloadCRTSettings()
+{
+    char path[0x400];
+    GetCRTSettingsPath(path, sizeof(path));
+
+    struct stat fileInfo;
+
+    if (stat(path, &fileInfo) != 0)
+        return false;
+
+    // Distinguish an unreadable file from an empty/invalid CRT section.
+    std::ifstream readable(path, std::ios::binary);
+    if (!readable)
+        return false;
+    readable.close();
+
+    IniParser ini(path);
+
+    CRTSettings loaded = ReadCRTSettingsFromIni(ini);
+    crtSavedSettings   = loaded;
+    crtSettings        = loaded;
+
+    return true;
 }
 #endif
 

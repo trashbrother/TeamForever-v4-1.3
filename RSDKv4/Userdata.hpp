@@ -223,4 +223,9 @@ void SetFrameRate(int *enabled, int *unused);
 void ApplyWindowChanges();
 #endif
 
+#if RETRO_PLATFORM == RETRO_OSX
+bool SaveCRTSettings();
+bool ReloadCRTSettings();
+#endif
+
 #endif //! USERDATA_H
