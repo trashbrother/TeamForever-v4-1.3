@@ -242,6 +242,16 @@ bool processEvents()
                         break;
 
 #if RETRO_PLATFORM == RETRO_OSX
+                    case SDLK_s:
+                        if ((Engine.sdlEvents.key.keysym.mod & KMOD_CTRL) && !Engine.sdlEvents.key.repeat)
+                            SaveCRTSettings();
+                        break;
+
+                    case SDLK_r:
+                        if ((Engine.sdlEvents.key.keysym.mod & KMOD_CTRL) && !Engine.sdlEvents.key.repeat)
+                            ReloadCRTSettings();
+                        break;
+
                     case SDLK_F6:
                         if (Engine.masterPaused)
                             Engine.frameStep = true;

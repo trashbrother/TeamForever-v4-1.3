@@ -311,7 +311,7 @@ bool ReloadCRTSettings()
         return false;
     readable.close();
 
-    IniParser ini(path);
+    IniParser ini(path, false);
 
     CRTSettings loaded = ReadCRTSettingsFromIni(ini);
     crtSavedSettings   = loaded;
