@@ -1,5 +1,79 @@
 #include "RetroEngine.hpp"
 
+#if RETRO_PLATFORM == RETRO_OSX
+#include "metalPostprocess.hpp"
+
+enum CRTParameter {
+    CRT_PARAMETER_CURVATURE,
+    CRT_PARAMETER_BEAM,
+    CRT_PARAMETER_MASK,
+    CRT_PARAMETER_BLOOM,
+    CRT_PARAMETER_CONVERGENCE,
+    CRT_PARAMETER_VIGNETTE,
+};
+
+static int crtSelectedParameter = CRT_PARAMETER_CURVATURE;
+
+static float *GetCRTParameterValue(CRTSettings &settings, int parameter)
+{
+    switch (parameter) {
+        case CRT_PARAMETER_CURVATURE: return &settings.curvature;
+        case CRT_PARAMETER_BEAM: return &settings.beam;
+        case CRT_PARAMETER_MASK: return &settings.mask;
+        case CRT_PARAMETER_BLOOM: return &settings.bloom;
+        case CRT_PARAMETER_CONVERGENCE: return &settings.convergence;
+        case CRT_PARAMETER_VIGNETTE: return &settings.vignette;
+        default: return nullptr;
+    }
+}
+
+static const float *GetCRTParameterValue(const CRTSettings &settings, int parameter)
+{
+    switch (parameter) {
+        case CRT_PARAMETER_CURVATURE: return &settings.curvature;
+        case CRT_PARAMETER_BEAM: return &settings.beam;
+        case CRT_PARAMETER_MASK: return &settings.mask;
+        case CRT_PARAMETER_BLOOM: return &settings.bloom;
+        case CRT_PARAMETER_CONVERGENCE: return &settings.convergence;
+        case CRT_PARAMETER_VIGNETTE: return &settings.vignette;
+        default: return nullptr;
+    }
+}
+
+static void AdjustCRTSelectedParameter(float amount)
+{
+    float *value = GetCRTParameterValue(crtSettings, crtSelectedParameter);
+    if (!value)
+        return;
+
+    *value += amount;
+
+    if (*value < 0.0f)
+        *value = 0.0f;
+    else if (*value > 2.0f)
+        *value = 2.0f;
+}
+
+static void ResetCRTSelectedParameter()
+{
+    float *value              = GetCRTParameterValue(crtSettings, crtSelectedParameter);
+    const float *defaultValue = GetCRTParameterValue(crtDefaultSettings, crtSelectedParameter);
+
+    if (value && defaultValue)
+        *value = *defaultValue;
+}
+
+static void ResetCRTNumericParameters()
+{
+    crtSettings.curvature   = crtDefaultSettings.curvature;
+    crtSettings.beam        = crtDefaultSettings.beam;
+    crtSettings.mask        = crtDefaultSettings.mask;
+    crtSettings.bloom       = crtDefaultSettings.bloom;
+    crtSettings.convergence = crtDefaultSettings.convergence;
+    crtSettings.vignette    = crtDefaultSettings.vignette;
+}
+#endif
+
 #if !RETRO_USE_ORIGINAL_CODE
 bool usingCWD        = false;
 bool engineDebugMode = false;
@@ -146,6 +220,29 @@ bool processEvents()
 #endif //! RETRO_USING_SDL2
 
             case SDL_KEYDOWN:
+#if RETRO_PLATFORM == RETRO_OSX
+                if ((Engine.sdlEvents.key.keysym.mod & KMOD_CTRL) && !Engine.sdlEvents.key.repeat) {
+                    if (Engine.sdlEvents.key.keysym.scancode >= SDL_SCANCODE_1
+                        && Engine.sdlEvents.key.keysym.scancode <= SDL_SCANCODE_6) {
+                        crtSelectedParameter = Engine.sdlEvents.key.keysym.scancode - SDL_SCANCODE_1;
+                        break;
+                    }
+
+                    if (Engine.sdlEvents.key.keysym.scancode == SDL_SCANCODE_7) {
+                        crtSettings.enabled = !crtSettings.enabled;
+                        break;
+                    }
+
+                    if (Engine.sdlEvents.key.keysym.scancode == SDL_SCANCODE_0) {
+                        if (Engine.sdlEvents.key.keysym.mod & KMOD_SHIFT)
+                            ResetCRTNumericParameters();
+                        else
+                            ResetCRTSelectedParameter();
+                        break;
+                    }
+                }
+#endif
+
                 switch (Engine.sdlEvents.key.keysym.sym) {
                     default: break;
                     case SDLK_ESCAPE:
@@ -242,6 +339,23 @@ bool processEvents()
                         break;
 
 #if RETRO_PLATFORM == RETRO_OSX
+                    case SDLK_PLUS:
+                    case SDLK_KP_PLUS:
+                        if (Engine.sdlEvents.key.keysym.mod & KMOD_CTRL)
+                            AdjustCRTSelectedParameter(0.05f);
+                        break;
+
+                    case SDLK_EQUALS:
+                        if ((Engine.sdlEvents.key.keysym.mod & KMOD_CTRL) && (Engine.sdlEvents.key.keysym.mod & KMOD_SHIFT))
+                            AdjustCRTSelectedParameter(0.05f);
+                        break;
+
+                    case SDLK_MINUS:
+                    case SDLK_KP_MINUS:
+                        if (Engine.sdlEvents.key.keysym.mod & KMOD_CTRL)
+                            AdjustCRTSelectedParameter(-0.05f);
+                        break;
+
                     case SDLK_s:
                         if ((Engine.sdlEvents.key.keysym.mod & KMOD_CTRL) && !Engine.sdlEvents.key.repeat)
                             SaveCRTSettings();
