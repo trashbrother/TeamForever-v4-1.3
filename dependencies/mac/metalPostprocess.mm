@@ -454,12 +454,13 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr,
              "    VSOut in [[stage_in]],\n"
              "    texture2d<float> narrowSrc [[texture(0)]],\n"
              "    texture2d<float> wideSrc [[texture(1)]],\n"
-             "    sampler samp [[sampler(0)]]) {\n"
+             "    sampler samp [[sampler(0)]],\n"
+             "    constant float &bloomIntensity [[buffer(0)]]) {\n"
              "    float3 narrowGlow = narrowSrc.sample(samp, in.uv).rgb;\n"
              "    float3 wideGlow = wideSrc.sample(samp, in.uv).rgb;\n"
              "\n"
              "    float4 glow;\n"
-             "    glow.rgb = narrowGlow * 0.10 + wideGlow * 0.04;\n"
+             "    glow.rgb = (narrowGlow * 0.10 + wideGlow * 0.04) * bloomIntensity;\n"
              "    glow.a = 1.0;\n"
              "    return glow;\n"
              "}\n";
@@ -531,6 +532,12 @@ void metalCompositeProbe(void *encoderPtr, void *layerPtr,
     [encoder setViewport:viewport];
     [encoder setScissorRect:scissor];
     [encoder setRenderPipelineState:pipeline];
+
+    float bloomIntensity = crtSettings.bloom;
+    [encoder setFragmentBytes:&bloomIntensity
+                       length:sizeof(bloomIntensity)
+                      atIndex:0];
+
     [encoder setFragmentTexture:texture atIndex:0];
     [encoder setFragmentTexture:diffuseTexture atIndex:1];
     [encoder setFragmentSamplerState:sampler atIndex:0];
