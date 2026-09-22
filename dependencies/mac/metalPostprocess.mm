@@ -78,6 +78,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
 
     static id<MTLRenderPipelineState> pipeline = nil;
     static id<MTLSamplerState> sampler = nil;
+    static id<MTLSamplerState> convergenceSampler = nil;
     static bool attempted = false;
 
     if (!attempted) {
@@ -118,7 +119,9 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "fragment float4 rsdkCopyFragment(\n"
              "    VSOut in [[stage_in]],\n"
              "    texture2d<float> src [[texture(0)]],\n"
-             "    sampler samp [[sampler(0)]]) {\n"
+             "    sampler samp [[sampler(0)]],\n"
+             "    sampler convergenceSamp [[sampler(1)]],\n"
+             "    constant float &convergenceIntensity [[buffer(0)]]) {\n"
              "    float2 texSize = float2(src.get_width(), src.get_height());\n"
              "    float2 texel = 1.0 / texSize;\n"
              "\n"
@@ -169,7 +172,9 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    float w3 =  0.5 * fx3 - 0.5 * fx2;\n"
              "\n"
              "    float2 convergencePos = warpedUV * 2.0 - 1.0;\n"
-             "    float convergence = 0.035 * convergencePos.x * abs(convergencePos.x);\n"
+             "    float baseConvergence = min(convergenceIntensity, 1.0);\n"
+             "    float convergence = 0.035 * baseConvergence\n"
+             "        * convergencePos.x * abs(convergencePos.x);\n"
              "\n"
              "    float dw0 = -1.5 * fx2 + 2.0 * fx - 0.5;\n"
              "    float dw1 =  4.5 * fx2 - 5.0 * fx;\n"
@@ -191,6 +196,28 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "\n"
              "    float4 color0 = clamp(raw0, min(c01, c02), max(c01, c02));\n"
              "    float4 color1 = clamp(raw1, min(c11, c12), max(c11, c12));\n"
+             "\n"
+             "    float extraConvergence = max(convergenceIntensity - 1.0, 0.0);\n"
+             "    float2 extraOffsetPx = float2(\n"
+             "        1.00 * convergencePos.x * abs(convergencePos.x),\n"
+             "        0.50 * convergencePos.y * abs(convergencePos.y))\n"
+             "        * extraConvergence;\n"
+             "    float2 extraOffsetUV = extraOffsetPx * texel;\n"
+             "\n"
+             "    float2 row0UV = float2(warpedUV.x, sampleY0);\n"
+             "    float2 row1UV = float2(warpedUV.x, sampleY1);\n"
+             "\n"
+             "    float4 center0 = src.sample(convergenceSamp, row0UV);\n"
+             "    float4 center1 = src.sample(convergenceSamp, row1UV);\n"
+             "    float4 red0 = src.sample(convergenceSamp, row0UV - extraOffsetUV);\n"
+             "    float4 red1 = src.sample(convergenceSamp, row1UV - extraOffsetUV);\n"
+             "    float4 blue0 = src.sample(convergenceSamp, row0UV + extraOffsetUV);\n"
+             "    float4 blue1 = src.sample(convergenceSamp, row1UV + extraOffsetUV);\n"
+             "\n"
+             "    color0.r = clamp(color0.r + red0.r - center0.r, 0.0, 1.0);\n"
+             "    color1.r = clamp(color1.r + red1.r - center1.r, 0.0, 1.0);\n"
+             "    color0.b = clamp(color0.b + blue0.b - center0.b, 0.0, 1.0);\n"
+             "    color1.b = clamp(color1.b + blue1.b - center1.b, 0.0, 1.0);\n"
              "\n"
              "    float3 horiz0 = 0.5 * (c01.rgb + c02.rgb);\n"
              "    float3 horiz1 = 0.5 * (c11.rgb + c12.rgb);\n"
@@ -254,7 +281,8 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    slope1 *= step(darkSupport1, beamRaw1);\n"
              "\n"
              "    float verticalConvergence =\n"
-             "        0.010 * convergencePos.y * abs(convergencePos.y);\n"
+             "        0.010 * baseConvergence\n"
+             "        * convergencePos.y * abs(convergencePos.y);\n"
              "\n"
              "    float redSlope = color0.r * slope0 + color1.r * slope1;\n"
              "    float blueSlope = color0.b * slope0 + color1.b * slope1;\n"
@@ -351,6 +379,17 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
                 samplerDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
 
                 sampler = [layer.device newSamplerStateWithDescriptor:samplerDesc];
+
+                MTLSamplerDescriptor *convergenceSamplerDesc =
+                    [[MTLSamplerDescriptor alloc] init];
+
+                convergenceSamplerDesc.minFilter = MTLSamplerMinMagFilterLinear;
+                convergenceSamplerDesc.magFilter = MTLSamplerMinMagFilterLinear;
+                convergenceSamplerDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
+                convergenceSamplerDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
+
+                convergenceSampler =
+                    [layer.device newSamplerStateWithDescriptor:convergenceSamplerDesc];
             }
         }
 
@@ -367,7 +406,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
         }
     }
 
-    if (!pipeline || !sampler)
+    if (!pipeline || !sampler || !convergenceSampler)
         return;
 
     MTLViewport viewport;
@@ -388,8 +427,15 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder setViewport:viewport];
     [encoder setScissorRect:scissor];
     [encoder setRenderPipelineState:pipeline];
+
+    float convergenceIntensity = crtSettings.convergence;
+    [encoder setFragmentBytes:&convergenceIntensity
+                       length:sizeof(convergenceIntensity)
+                      atIndex:0];
+
     [encoder setFragmentTexture:texture atIndex:0];
     [encoder setFragmentSamplerState:sampler atIndex:0];
+    [encoder setFragmentSamplerState:convergenceSampler atIndex:1];
     [encoder drawPrimitives:MTLPrimitiveTypeTriangle
                 vertexStart:0
                 vertexCount:6];
