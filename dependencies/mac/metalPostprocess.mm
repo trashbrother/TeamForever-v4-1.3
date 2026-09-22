@@ -121,14 +121,19 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    texture2d<float> src [[texture(0)]],\n"
              "    sampler samp [[sampler(0)]],\n"
              "    sampler convergenceSamp [[sampler(1)]],\n"
-             "    constant float &convergenceIntensity [[buffer(0)]]) {\n"
+             "    constant float &convergenceIntensity [[buffer(0)]],\n"
+             "    constant float &curvatureIntensity [[buffer(1)]]) {\n"
              "    float2 texSize = float2(src.get_width(), src.get_height());\n"
              "    float2 texel = 1.0 / texSize;\n"
              "\n"
              "    float2 warpedUV = in.uv * 2.0 - 1.0;\n"
-             "    const float warpX = 0.009;\n"
-             "    const float warpY = 0.012;\n"
-             "    float asymX = 0.00035 * warpedUV.y * warpedUV.y * warpedUV.y;\n"
+             "    float curvatureScale = curvatureIntensity <= 1.0\n"
+             "        ? curvatureIntensity\n"
+             "        : 1.0 + 0.25 * (curvatureIntensity - 1.0);\n"
+             "    float warpX = 0.009 * curvatureScale;\n"
+             "    float warpY = 0.012 * curvatureScale;\n"
+             "    float asymX = 0.00035 * curvatureScale\n"
+             "        * warpedUV.y * warpedUV.y * warpedUV.y;\n"
              "    warpedUV *= float2(1.0 + warpedUV.y * warpedUV.y * warpX + asymX,\n"
              "                       1.0 + warpedUV.x * warpedUV.x * warpY);\n"
              "    warpedUV = warpedUV * 0.5 + 0.5;\n"
@@ -432,6 +437,11 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder setFragmentBytes:&convergenceIntensity
                        length:sizeof(convergenceIntensity)
                       atIndex:0];
+
+    float curvatureIntensity = crtSettings.curvature;
+    [encoder setFragmentBytes:&curvatureIntensity
+                       length:sizeof(curvatureIntensity)
+                      atIndex:1];
 
     [encoder setFragmentTexture:texture atIndex:0];
     [encoder setFragmentSamplerState:sampler atIndex:0];
