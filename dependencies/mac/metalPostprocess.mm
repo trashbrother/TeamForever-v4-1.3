@@ -124,7 +124,8 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    constant float &convergenceIntensity [[buffer(0)]],\n"
              "    constant float &curvatureIntensity [[buffer(1)]],\n"
              "    constant float &beamIntensity [[buffer(2)]],\n"
-             "    constant float &maskIntensity [[buffer(3)]]) {\n"
+             "    constant float &maskIntensity [[buffer(3)]],\n"
+             "    constant float &vignetteIntensity [[buffer(4)]]) {\n"
              "    float2 texSize = float2(src.get_width(), src.get_height());\n"
              "    float2 texel = 1.0 / texSize;\n"
              "\n"
@@ -353,16 +354,21 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    color.rgb *= mask;\n"
              "    color.rgb *= 1.0 + 0.12 * maskIntensity;\n"
              "\n"
+             "    float vignetteScale = vignetteIntensity <= 1.0\n"
+             "        ? vignetteIntensity\n"
+             "        : 1.0 + 1.5 * (vignetteIntensity - 1.0);\n"
+             "\n"
              "    float2 vignettePos = warpedUV * 2.0 - 1.0;\n"
              "    float vignetteRadius = dot(vignettePos, vignettePos);\n"
-             "    float vignette = 1.0 - 0.055 * vignetteRadius;\n"
+             "    float vignette = 1.0 - 0.055 * vignetteScale * vignetteRadius;\n"
              "\n"
              "    float2 edgePos = abs(vignettePos);\n"
              "    float cornerX = smoothstep(0.82, 1.0, edgePos.x);\n"
              "    float cornerY = smoothstep(0.82, 1.0, edgePos.y);\n"
-             "    float faceplate = 1.0 - 0.035 * cornerX * cornerY;\n"
+             "    float faceplate = 1.0 - 0.035 * vignetteScale * cornerX * cornerY;\n"
              "\n"
-             "    color.rgb *= clamp(vignette, 0.88, 1.0) * faceplate;\n"
+             "    float vignetteFloor = 1.0 - 0.12 * vignetteScale;\n"
+             "    color.rgb *= clamp(vignette, vignetteFloor, 1.0) * faceplate;\n"
              "\n"
              "    color.rgb = pow(max(color.rgb, float3(0.0)), float3(1.0 / 2.2));\n"
              "    color.a = 1.0;\n"
@@ -471,6 +477,11 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder setFragmentBytes:&maskIntensity
                        length:sizeof(maskIntensity)
                       atIndex:3];
+
+    float vignetteIntensity = crtSettings.vignette;
+    [encoder setFragmentBytes:&vignetteIntensity
+                       length:sizeof(vignetteIntensity)
+                      atIndex:4];
 
     [encoder setFragmentTexture:texture atIndex:0];
     [encoder setFragmentSamplerState:sampler atIndex:0];
