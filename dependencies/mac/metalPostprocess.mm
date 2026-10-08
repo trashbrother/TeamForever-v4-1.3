@@ -123,7 +123,8 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    sampler convergenceSamp [[sampler(1)]],\n"
              "    constant float &convergenceIntensity [[buffer(0)]],\n"
              "    constant float &curvatureIntensity [[buffer(1)]],\n"
-             "    constant float &beamIntensity [[buffer(2)]]) {\n"
+             "    constant float &beamIntensity [[buffer(2)]],\n"
+             "    constant float &maskIntensity [[buffer(3)]]) {\n"
              "    float2 texSize = float2(src.get_width(), src.get_height());\n"
              "    float2 texel = 1.0 / texSize;\n"
              "\n"
@@ -329,7 +330,9 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "\n"
              "    float2 outputPixel = floor(in.position.xy);\n"
              "    float maskY = fmod(outputPixel.y, 2.0);\n"
-             "    float maskStrength = mix(0.18, 0.11, smoothstep(0.55, 1.0, shapedLuma));\n"
+             "    float maskStrength =\n"
+             "        mix(0.18, 0.11, smoothstep(0.55, 1.0, shapedLuma))\n"
+             "        * maskIntensity;\n"
              "\n"
              "    float maskPhase = fmod(outputPixel.x + 2.0 * maskY, 6.0);\n"
              "\n"
@@ -348,7 +351,7 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
              "    float3 mask = float3(1.0 - maskStrength) + phosphor * maskStrength;\n"
              "\n"
              "    color.rgb *= mask;\n"
-             "    color.rgb *= 1.12;\n"
+             "    color.rgb *= 1.0 + 0.12 * maskIntensity;\n"
              "\n"
              "    float2 vignettePos = warpedUV * 2.0 - 1.0;\n"
              "    float vignetteRadius = dot(vignettePos, vignettePos);\n"
@@ -463,6 +466,11 @@ void metalCopyProbe(void *encoderPtr, void *layerPtr, void *texturePtr)
     [encoder setFragmentBytes:&beamIntensity
                        length:sizeof(beamIntensity)
                       atIndex:2];
+
+    float maskIntensity = crtSettings.mask;
+    [encoder setFragmentBytes:&maskIntensity
+                       length:sizeof(maskIntensity)
+                      atIndex:3];
 
     [encoder setFragmentTexture:texture atIndex:0];
     [encoder setFragmentSamplerState:sampler atIndex:0];
