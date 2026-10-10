@@ -526,41 +526,43 @@ void FlipScreen()
             SDL_RenderFillRect(Engine.renderer, NULL);
         // no change here
 #if defined(__APPLE__)
-        SDL_RenderFlush(Engine.renderer);
-        void *metalEncoder = SDL_RenderGetMetalCommandEncoder(Engine.renderer);
-        void *metalLayer = SDL_RenderGetMetalLayer(Engine.renderer);
-        void *metalTexture = SDL_RenderGetMetalTexture(Engine.screenBuffer);
-        metalPostprocessProbe(metalEncoder);
-        metalLayerProbe(metalLayer);
-        metalCopyProbe(metalEncoder, metalLayer, metalTexture);
+        if (crtSettings.enabled) {
+            SDL_RenderFlush(Engine.renderer);
+            void *metalEncoder = SDL_RenderGetMetalCommandEncoder(Engine.renderer);
+            void *metalLayer = SDL_RenderGetMetalLayer(Engine.renderer);
+            void *metalTexture = SDL_RenderGetMetalTexture(Engine.screenBuffer);
+            metalPostprocessProbe(metalEncoder);
+            metalLayerProbe(metalLayer);
+            metalCopyProbe(metalEncoder, metalLayer, metalTexture);
 
-        void *metalRenderTarget =
-            SDL_RenderGetMetalRenderTargetTexture(Engine.renderer);
-        metalRenderTargetProbe(metalRenderTarget);
+            void *metalRenderTarget =
+                SDL_RenderGetMetalRenderTargetTexture(Engine.renderer);
+            metalRenderTargetProbe(metalRenderTarget);
 
-        void *metalCommandBuffer =
-            SDL_RenderGetMetalCommandBuffer(Engine.renderer);
+            void *metalCommandBuffer =
+                SDL_RenderGetMetalCommandBuffer(Engine.renderer);
 
-        if (metalCommandBuffer) {
-            SDL_RenderEndMetalCommandEncoder(Engine.renderer);
+            if (metalCommandBuffer) {
+                SDL_RenderEndMetalCommandEncoder(Engine.renderer);
 
-            void *metalDiffuseTexture = nullptr;
-            void *metalOffscreenTexture =
-                metalMultipassProbe(metalCommandBuffer,
+                void *metalDiffuseTexture = nullptr;
+                void *metalOffscreenTexture =
+                    metalMultipassProbe(metalCommandBuffer,
+                                        metalLayer,
+                                        metalRenderTarget,
+                                        &metalDiffuseTexture);
+
+                SDL_RenderResumeMetalCommandEncoder(Engine.renderer);
+
+                void *metalCompositeEncoder =
+                    SDL_RenderGetMetalCommandEncoder(Engine.renderer);
+
+                metalPostprocessProbe(metalCompositeEncoder);
+                metalCompositeProbe(metalCompositeEncoder,
                                     metalLayer,
-                                    metalRenderTarget,
-                                    &metalDiffuseTexture);
-
-            SDL_RenderResumeMetalCommandEncoder(Engine.renderer);
-
-            void *metalCompositeEncoder =
-                SDL_RenderGetMetalCommandEncoder(Engine.renderer);
-
-            metalPostprocessProbe(metalCompositeEncoder);
-            metalCompositeProbe(metalCompositeEncoder,
-                                metalLayer,
-                                metalOffscreenTexture,
-                                metalDiffuseTexture);
+                                    metalOffscreenTexture,
+                                    metalDiffuseTexture);
+            }
         }
 #endif
         SDL_RenderPresent(Engine.renderer);
